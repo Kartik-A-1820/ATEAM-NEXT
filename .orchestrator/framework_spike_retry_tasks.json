@@ -1,0 +1,12 @@
+[
+  {
+    "agent": "claude",
+    "role": "Framework decision reviewer",
+    "prompt": "ROLE: Framework decision reviewer.\nOBJECTIVE: Return a direct framework decision critique for a NEW project called Ateam. There is no existing code to inspect. Compare Go+Bubble Tea v2, TypeScript+Ink, Rust+Ratatui, Python+Textual for Windows-first multi-agent TUI with multiline input, paste, resize, streaming background events, cancellation, testability, packaging, and maintainability. Local fact: on this machine Node is installed; Go and Rust are not on PATH. Do not ask questions.\nREPOSITORY/CWD: F:\\\\ATEAM-NEXT.\nCONSTRAINTS: Analysis-only, no edits.\nACCEPTANCE CRITERIA: Pick a stack for Milestone 1 and list risks/mitigations. Challenge Go+Bubble Tea at least once.\nREQUESTED RESPONSE FORMAT:\nSTATUS\nFINDINGS\nCHANGES\nFILES_TOUCHED\nTESTS_RUN\nRISKS\nRECOMMENDATION"
+  },
+  {
+    "agent": "grok",
+    "role": "Rust/Ratatui adversarial reviewer",
+    "prompt": "ROLE: Rust/Ratatui adversarial reviewer.\nOBJECTIVE: Short adversarial critique for Ateam framework decision. Compare Rust+Ratatui/Tokio vs TypeScript+Ink and Go+Bubble Tea for Windows-first coding-agent TUI. Focus on cancellation, subprocess trees, crash recovery, TUI testing, packaging, startup, and local buildability. Local fact: Node is installed; Go and Rust are not on PATH. Do not ask questions.\nREPOSITORY/CWD: F:\\\\ATEAM-NEXT.\nCONSTRAINTS: Analysis-only, no edits.\nACCEPTANCE CRITERIA: Pick a stack for Milestone 1 and name major risks.\nREQUESTED RESPONSE FORMAT:\nSTATUS\nFINDINGS\nCHANGES\nFILES_TOUCHED\nTESTS_RUN\nRISKS\nRECOMMENDATION"
+  }
+]

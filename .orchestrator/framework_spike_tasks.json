@@ -1,0 +1,17 @@
+[
+  {
+    "agent": "claude",
+    "role": "Architecture critic",
+    "prompt": "ROLE: Architecture critic.\nOBJECTIVE: Evaluate Ateam's framework choice for a first-class multi-agent coding TUI. Challenge the preferred Go + Bubble Tea v2 hypothesis and compare it with TypeScript + Ink specifically for event/state architecture, maintainability, context/memory design, testing, and long-running sessions.\nREPOSITORY/CWD: F:\\\\ATEAM-NEXT. This is a new scratch project; do not modify files.\nRELEVANT FILES: none yet.\nCONSTRAINTS: Analysis-only. Use evidence from current framework capabilities you know or can inspect locally; do not fabricate version-specific claims. Consider Windows as first-class. Ateam requires active multiline input during background streaming, canonical provider-neutral events, cancellation, permission policy, planner/DAG/scheduler later, and simulated provider mode first.\nOWNERSHIP BOUNDARIES: No edits, no commits, no pushes.\nACCEPTANCE CRITERIA: Provide scored comparison notes and clear reasons to accept or reject Go/Bubble Tea vs TypeScript/Ink for THIS application, including risks and mitigations.\nTESTING EXPECTED: None; analysis only.\nREQUESTED RESPONSE FORMAT: Concise but evidence-oriented.\n\nSTATUS\nFINDINGS\nCHANGES\nFILES_TOUCHED\nTESTS_RUN\nRISKS\nRECOMMENDATION"
+  },
+  {
+    "agent": "agy",
+    "role": "Terminal UX and Windows reviewer",
+    "prompt": "ROLE: Terminal UX and Windows reviewer.\nOBJECTIVE: Evaluate terminal UX/input risks for Ateam and challenge the preferred Go + Bubble Tea choice. Investigate Python + Textual as a competing framework for high-quality terminal UX, multiline input, paste, Unicode, resize, background streaming, testing, packaging, startup time, and Windows child process handling.\nREPOSITORY/CWD: F:\\\\ATEAM-NEXT. This is a new scratch project; do not modify files.\nRELEVANT FILES: none yet.\nCONSTRAINTS: Analysis-only. Windows support is critical. Ateam must keep input active while simulated/real agents stream events and must never corrupt active input.\nOWNERSHIP BOUNDARIES: No edits, no commits, no pushes.\nACCEPTANCE CRITERIA: Identify which stack is best for Milestone 1 in this local environment and what technical mitigations are needed.\nTESTING EXPECTED: None; analysis only.\nREQUESTED RESPONSE FORMAT: Concise scored notes and recommendation.\n\nSTATUS\nFINDINGS\nCHANGES\nFILES_TOUCHED\nTESTS_RUN\nRISKS\nRECOMMENDATION"
+  },
+  {
+    "agent": "grok",
+    "role": "Failure-mode and CLI ergonomics reviewer",
+    "prompt": "ROLE: Failure-mode and CLI ergonomics reviewer.\nOBJECTIVE: Adversarially review Ateam's initial architecture direction. Challenge Go + Bubble Tea and investigate Rust + Ratatui/Crossterm/Tokio as a competitor, with emphasis on failure isolation, cancellation, subprocess trees on Windows, crash recovery, CLI command hierarchy, automation-friendly output, event protocol, and TUI testing.\nREPOSITORY/CWD: F:\\\\ATEAM-NEXT. This is a new scratch project; do not modify files.\nRELEVANT FILES: none yet.\nCONSTRAINTS: Analysis-only. Do not ask for implementation; return concrete risks and recommendations. Ateam runtime must own orchestration; providers never control it.\nOWNERSHIP BOUNDARIES: No edits, no commits, no pushes.\nACCEPTANCE CRITERIA: Clear scored critique and recommended stack/architecture safeguards.\nTESTING EXPECTED: None; analysis only.\nREQUESTED RESPONSE FORMAT: Concise but adversarial.\n\nSTATUS\nFINDINGS\nCHANGES\nFILES_TOUCHED\nTESTS_RUN\nRISKS\nRECOMMENDATION"
+  }
+]
