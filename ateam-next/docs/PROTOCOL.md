@@ -42,6 +42,14 @@ interface ProviderAdapter {
 
 Adapters may expose optional capabilities later. They must normalize provider-native protocols into this event model and tolerate unknown fields.
 
+## Codex Adapter
+
+The first production adapter target is Codex. Current implementation includes:
+
+- `codex doctor --json` probe scaffolding;
+- `codex exec --cd <cwd> --skip-git-repo-check --json -` execution scaffolding;
+- JSONL parser fixtures for stream deltas, tools, auth failure, rate limit, malformed lines, and unknown future events.
+
 ## State Ownership
 
 Ateam owns:

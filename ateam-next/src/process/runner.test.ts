@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import process from 'node:process';
-import {runProcess} from './runner.js';
+import {resolveExecutable, runProcess} from './runner.js';
 
 describe('process runner', () => {
   it('runs an executable with explicit argv and captures stdout/stderr separately', async () => {
@@ -25,5 +25,9 @@ describe('process runner', () => {
 
     expect(result.timedOut).toBe(true);
     expect(result.exitCode).not.toBe(0);
+  });
+
+  it('resolves executables through PATH on Windows', () => {
+    expect(resolveExecutable(process.execPath)).toBe(process.execPath);
   });
 });

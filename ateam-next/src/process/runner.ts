@@ -1,4 +1,4 @@
-import {spawn} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 import process from 'node:process';
 
 export interface ProcessSpec {
@@ -28,9 +28,11 @@ export async function runProcess(spec: ProcessSpec): Promise<ProcessResult> {
   const started = Date.now();
   let timedOut = false;
   let aborted = false;
+  const resolved = resolveExecutable(spec.executable);
+  const spawnSpec = commandForSpawn(resolved, spec.args);
 
   return await new Promise<ProcessResult>((resolve, reject) => {
-    const child = spawn(spec.executable, spec.args, {
+    const child = spawn(spawnSpec.executable, spawnSpec.args, {
       cwd: spec.cwd,
       env: {...process.env, ...spec.env},
       windowsHide: true,
@@ -48,7 +50,7 @@ export async function runProcess(spec: ProcessSpec): Promise<ProcessResult> {
       if (timeout) clearTimeout(timeout);
       spec.signal?.removeEventListener('abort', onAbort);
       resolve({
-        executable: spec.executable,
+        executable: resolved,
         args: spec.args,
         cwd: spec.cwd,
         exitCode,
@@ -102,6 +104,15 @@ export async function runProcess(spec: ProcessSpec): Promise<ProcessResult> {
   });
 }
 
+export function resolveExecutable(executable: string): string {
+  if (process.platform !== 'win32' || executable.includes('\\') || executable.includes('/')) {
+    return executable;
+  }
+  const result = spawnSync('where.exe', [executable], {encoding: 'utf8', windowsHide: true});
+  const candidates = result.stdout.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  return candidates.find(candidate => /\.(exe|cmd|bat)$/i.test(candidate)) ?? candidates[0] ?? executable;
+}
+
 export async function terminateProcessTree(pid: number): Promise<void> {
   if (process.platform === 'win32') {
     await new Promise<void>(resolve => {
@@ -131,4 +142,14 @@ export async function terminateProcessTree(pid: number): Promise<void> {
       // Process may already be gone.
     }
   }
+}
+
+function commandForSpawn(executable: string, args: string[]): {executable: string; args: string[]} {
+  if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(executable)) {
+    return {
+      executable: 'cmd.exe',
+      args: ['/d', '/c', executable, ...args],
+    };
+  }
+  return {executable, args};
 }

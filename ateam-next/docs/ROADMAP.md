@@ -14,6 +14,9 @@
 - Detail views for agents, tasks, context, diff, and logs started.
 - Headless simulation now executes the simulator and returns canonical events/state.
 - Windows-aware process runner foundation added.
+- SQLite persistence with migrations, session list, and event replay added.
+- Doctor command probes Git and all four provider executables.
+- Codex adapter parser fixtures and scaffold added.
 - Unit tests for commands, reducer, input editor, runtime, simulator, process runner, headless mode, and TUI render/input.
 
 ## IN_PROGRESS
@@ -22,11 +25,15 @@
 - Manual terminal exercise across simulation scenarios.
 - Input hardening for large paste and advanced key combinations.
 - Milestone 2 core runtime boundaries.
+- Milestone 4 persistence foundation.
+- Milestone 3 Codex adapter contract foundation.
 - Terminal teardown polish: PTY capture still shows a trailing border character after Ctrl+C even though the shell prompt returns.
 
 ## NEXT
 
-- Milestone 2 core runtime: cancellation model, lifecycle, error model, effect boundaries.
+- Milestone 2 core runtime: lifecycle, error model, effect boundaries.
+- Milestone 5 planner and mutable DAG.
+- Milestone 6 deterministic scheduler.
 - Add render throttling and scrollback windowing.
 - Expand process-control utilities with provider fixtures and abort-signal tests.
 - Expand simulation tests for rate limit, permission, crash, and cancellation.

@@ -39,6 +39,18 @@ export function App({simulate, scenario}: Props) {
     send({type: 'TerminalResized', width: columns, height: rows, at: Date.now()});
   }, [columns, rows]);
 
+  React.useEffect(() => {
+    if (process.stdout.isTTY !== true) return undefined;
+    const cleanup = () => {
+      process.stdout.write('\x1b[?25h\x1b[0m\n');
+    };
+    process.once('exit', cleanup);
+    return () => {
+      process.off('exit', cleanup);
+      cleanup();
+    };
+  }, []);
+
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
       runtime.handle({kind: 'stop', scope: 'all'});
@@ -68,7 +80,7 @@ export function App({simulate, scenario}: Props) {
     <Box flexDirection="column" width={columns} height={rows}>
       <Header state={state} />
       <MainPane state={state} entries={entries} height={conversationHeight} width={width} />
-      <Tabs />
+      <Footer activeTab={state.activeTab} />
       <InputBox onSubmit={submit} />
     </Box>
   );
@@ -100,7 +112,7 @@ function MainPane({state, entries, height, width}: {state: ReturnType<typeof ini
   if (state.activeTab === 'Logs') {
     return (
       <Box flexDirection="column" height={height} paddingX={1}>
-        {state.log.slice(-height).map((line, index) => <Text key={`${index}-${line}`}>{wrapAnsi(line, width, {hard: true})}</Text>)}
+        {state.log.slice(-Math.max(1, Math.floor(height / 2))).map((line, index) => <Text key={`${index}-${line}`}>{wrapAnsi(line, width, {hard: true})}</Text>)}
       </Box>
     );
   }
@@ -154,10 +166,10 @@ function Header({state}: {state: ReturnType<typeof initialState>}) {
   );
 }
 
-function Tabs() {
+function Footer({activeTab}: {activeTab: string}) {
   return (
     <Box borderStyle="single" paddingX={1}>
-      <Text>Plan | Agents | Tasks | Diff | Context | Logs</Text>
+      <Text>{['Plan', 'Agents', 'Tasks', 'Diff', 'Context', 'Logs'].map(tab => tab === activeTab ? `[${tab}]` : tab).join(' | ')}  /help /stop /quit</Text>
     </Box>
   );
 }

@@ -1,0 +1,17 @@
+[
+  {
+    "agent": "claude",
+    "role": "SQLite persistence reviewer",
+    "prompt": "ROLE: SQLite persistence reviewer.\nOBJECTIVE: Review and recommend a minimal durable persistence design for Ateam Next using Node's built-in node:sqlite. Entities needed now: sessions, events, messages, tasks, memories. Requirements: migrations from beginning, crash recovery, resume latest/by ID, queryable event log, Windows paths. Do not edit files.\nREPOSITORY/CWD: F:\\\\ATEAM-NEXT\\\\ateam-next.\nRELEVANT FILES: docs/ARCHITECTURE.md, docs/PROTOCOL.md, src/domain/events.ts, src/domain/state.ts.\nCONSTRAINTS: Analysis-only. Stack is TypeScript/Node. No native npm SQLite dependency.\nOWNERSHIP BOUNDARIES: No edits, commits, pushes.\nACCEPTANCE CRITERIA: Concrete schema, risks, and tests to add.\nTESTING EXPECTED: Static review only.\nREQUESTED RESPONSE FORMAT: STATUS, FINDINGS, CHANGES, FILES_TOUCHED, TESTS_RUN, RISKS, RECOMMENDATION"
+  },
+  {
+    "agent": "agy",
+    "role": "Codex adapter contract reviewer",
+    "prompt": "ROLE: Codex adapter contract reviewer.\nOBJECTIVE: Propose the first production provider adapter contract tests for Codex CLI in Ateam Next. Use current known CLI shape: codex exec --cd <cwd> --skip-git-repo-check --json - reads prompt from stdin; codex doctor --json probes health. Focus on JSONL parsing fixtures, auth/error/rate-limit handling, stream delta normalization, cancellation, no ANSI UI parsing. Do not edit files.\nREPOSITORY/CWD: F:\\\\ATEAM-NEXT\\\\ateam-next.\nRELEVANT FILES: src/domain/events.ts, src/process/runner.ts, docs/PROTOCOL.md.\nCONSTRAINTS: Analysis-only. Do not consume model quota. No real provider execution.\nOWNERSHIP BOUNDARIES: No edits, commits, pushes.\nACCEPTANCE CRITERIA: Concrete fixture cases and parser behavior.\nTESTING EXPECTED: Static review only.\nREQUESTED RESPONSE FORMAT: STATUS, FINDINGS, CHANGES, FILES_TOUCHED, TESTS_RUN, RISKS, RECOMMENDATION"
+  },
+  {
+    "agent": "grok",
+    "role": "TUI rendering hardening reviewer",
+    "prompt": "ROLE: TUI rendering hardening reviewer.\nOBJECTIVE: Review Ateam Next Ink TUI render/teardown risks. Focus on avoiding active input corruption, trailing artifacts on Ctrl+C, resize/overflow row budgeting, render throttling for many events, and snapshot testing. Do not edit files.\nREPOSITORY/CWD: F:\\\\ATEAM-NEXT\\\\ateam-next.\nRELEVANT FILES: src/tui/App.tsx, src/tui/InputBox.tsx, src/domain/state.ts.\nCONSTRAINTS: Analysis-only. Stack is TypeScript/Ink. Windows-first.\nOWNERSHIP BOUNDARIES: No edits, commits, pushes.\nACCEPTANCE CRITERIA: Concrete implementation recommendations and tests.\nTESTING EXPECTED: Static review only.\nREQUESTED RESPONSE FORMAT: STATUS, FINDINGS, CHANGES, FILES_TOUCHED, TESTS_RUN, RISKS, RECOMMENDATION"
+  }
+]

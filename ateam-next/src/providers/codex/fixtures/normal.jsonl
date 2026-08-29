@@ -1,0 +1,6 @@
+{"type":"session.started","session_id":"s-codex"}
+{"type":"message.delta","delta":"Hello "}
+{"type":"message.delta","delta":"world"}
+{"type":"tool.started","name":"shell"}
+{"type":"tool.finished","name":"shell","result":"exit 0"}
+{"type":"message.completed"}

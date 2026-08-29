@@ -13,7 +13,9 @@ Ateam owns orchestration. Providers are workers behind adapters; no provider con
 - Runtime: `src/runtime`, currently simulation-first.
 - Process control: `src/process`, explicit executable/argv spawning with stdout/stderr separation and Windows-aware process-tree termination.
 - Provider adapters: interface defined in `src/domain/events.ts`; production implementations are future work.
-- Persistence, planner, task graph, scheduler, permissions, memory, and context compiler: documented protocol boundaries now, implementation begins after the simulated TUI stabilizes.
+- Persistence: `src/storage`, using SQLite through `better-sqlite3` with migrations and event replay.
+- Provider adapters: `src/providers`, starting with Codex JSONL parser fixtures and probe/run scaffolding.
+- Planner, task graph, scheduler, permissions, memory, and context compiler: documented protocol boundaries now, implementation follows the core runtime slice.
 
 ## Runtime Flow
 
@@ -52,3 +54,9 @@ Milestone 2 should keep business logic outside Ink components. The reducer, comm
 ## Process Control
 
 Provider adapters must use explicit executable paths plus argument arrays. Prompts and large payloads should go through stdin where provider CLIs support it. The initial process runner captures stdout/stderr separately, supports timeout and abort-driven cancellation, hides child windows on Windows, and uses `taskkill.exe /pid <pid> /t /f` for Windows process trees.
+
+On Windows, command resolution prefers spawnable `.exe`, `.cmd`, and `.bat` entries from `where.exe`; this is required for CLIs such as Claude that install npm command shims.
+
+## Persistence
+
+SQLite is authoritative for sessions and event replay. Current tables include `sessions`, `events`, `messages`, `tasks`, and `memories`. The current implementation persists canonical events for headless simulated runs and can list/resume sessions from the event log.
