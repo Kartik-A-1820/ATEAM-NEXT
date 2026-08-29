@@ -15,6 +15,19 @@ export function InputBox({onSubmit, disabled = false}: Props) {
     if (key.ctrl && input === 'c') {
       return;
     }
+    const submitIndex = firstSubmitIndex(input);
+    if (submitIndex !== -1 && !key.shift) {
+      const beforeSubmit = input.slice(0, submitIndex);
+      setEditor(current => {
+        const withChunk = beforeSubmit.length > 0 ? insertText(current, beforeSubmit) : current;
+        const result = submit(withChunk);
+        if (result.submitted) {
+          onSubmit(result.submitted);
+        }
+        return result.state;
+      });
+      return;
+    }
     if (key.return && key.shift) {
       setEditor(current => applyEdit(current, 'newline'));
       return;
@@ -55,4 +68,12 @@ export function InputBox({onSubmit, disabled = false}: Props) {
       </Text>
     </Box>
   );
+}
+
+function firstSubmitIndex(input: string): number {
+  const carriage = input.indexOf('\r');
+  const newline = input.indexOf('\n');
+  if (carriage === -1) return newline;
+  if (newline === -1) return carriage;
+  return Math.min(carriage, newline);
 }

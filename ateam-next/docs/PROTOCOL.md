@@ -23,6 +23,7 @@ Ateam uses provider-neutral events. The UI consumes state derived from these eve
 - `VerbosityChanged`
 - `PermissionModeChanged`
 - `StopRequested`
+- `ViewChanged`
 
 Schemas live in `src/domain/events.ts`.
 
@@ -54,3 +55,14 @@ Ateam owns:
 - persistence and resume.
 
 Provider sessions are projections or caches, not the source of truth.
+
+## Cancellation Scope
+
+`StopRequested.scope` currently accepts:
+
+- `all`
+- `current`
+- `task:<id>`
+- `agent:<agentId>`
+
+The reducer cancels matching cancellable tasks and leaves completed work intact.

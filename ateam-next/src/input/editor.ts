@@ -103,6 +103,7 @@ function nextWord(value: string, cursor: number): number {
 
 function historyMove(state: InputEditorState, direction: -1 | 1): InputEditorState {
   if (state.history.length === 0) return state;
+  if (state.historyIndex === undefined && direction === 1) return state;
   const current = state.historyIndex ?? state.history.length;
   const next = Math.max(0, Math.min(state.history.length, current + direction));
   if (next === state.history.length) {

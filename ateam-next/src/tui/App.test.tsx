@@ -11,4 +11,12 @@ describe('App TUI', () => {
     expect(lastFrame()).toContain('>');
     unmount();
   });
+
+  it('submits slash commands through the TUI input path', async () => {
+    const {lastFrame, stdin, unmount} = render(<App simulate={true} scenario="FAST" />);
+    stdin.write('/verbosity trace\r');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(lastFrame()).toContain('TRACE');
+    unmount();
+  });
 });

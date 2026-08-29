@@ -1,4 +1,5 @@
 import type {AteamEvent} from './events.js';
+import {parseStopScope} from './events.js';
 import type {AgentId, AgentState, AppState, ConversationEntry, Verbosity} from './types.js';
 
 const agentDefaults: Record<AgentId, AgentState> = {
@@ -108,17 +109,32 @@ export function reduce(state: AppState, event: AteamEvent): AppState {
       next.permissionMode = event.mode;
       next.conversation.push(entry('System', `Permission mode set to ${event.mode}.`, 'QUIET'));
       return next;
-    case 'StopRequested':
+    case 'StopRequested': {
+      const scope = parseStopScope(event.scope);
       for (const task of Object.values(next.tasks)) {
-        if (task.status === 'RUNNING' || task.status === 'READY') {
+        const cancellable = task.status === 'RUNNING' || task.status === 'READY' || task.status === 'PENDING' || task.status === 'BLOCKED';
+        const matches =
+          scope.kind === 'all' ||
+          scope.kind === 'current' ||
+          (scope.kind === 'task' && task.id === scope.taskId) ||
+          (scope.kind === 'agent' && task.assignedAgent === scope.agentId);
+        if (cancellable && matches) {
           next.tasks[task.id] = {...task, status: 'CANCELLED'};
         }
       }
-      next.running = false;
+      if (scope.kind === 'agent') {
+        const agent = next.agents[scope.agentId];
+        next.agents[scope.agentId] = {...agent, availability: 'READY', runningTaskCount: 0};
+      }
+      next.running = Object.values(next.tasks).some(task => task.status === 'RUNNING' || task.status === 'READY' || task.status === 'PENDING');
       next.conversation.push(entry('System', `Stop requested for ${event.scope}.`, 'QUIET'));
       return next;
+    }
     case 'SessionStarted':
       next.sessionId = event.sessionId;
+      return next;
+    case 'ViewChanged':
+      next.activeTab = event.tab;
       return next;
     default:
       return next;

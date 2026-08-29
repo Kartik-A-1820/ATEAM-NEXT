@@ -5,6 +5,7 @@ import {render} from 'ink';
 import process from 'node:process';
 import {App} from './tui/App.js';
 import type {SimulationScenario} from './runtime/simulator.js';
+import {runHeadlessSimulation} from './runtime/headless.js';
 
 const program = new Command();
 
@@ -28,19 +29,23 @@ program.command('run')
   .argument('<prompt>')
   .option('--json', 'emit structured JSON')
   .option('--simulate', 'use simulated execution', false)
-  .action((prompt: string, options: {json?: boolean; simulate?: boolean}, command: Command) => {
-    const localOptions = typeof command.opts === 'function' ? command.opts<{json?: boolean; simulate?: boolean}>() : options;
-    const result = {
-      sessionId: `headless-${Date.now()}`,
-      prompt,
-      mode: localOptions.simulate ? 'simulate' : 'provider',
-      status: localOptions.simulate ? 'completed' : 'not_configured',
-      message: localOptions.simulate ? 'Simulated headless execution completed.' : 'Production providers are not wired yet; use --simulate or interactive dev mode.',
-    };
+  .option('--scenario <scenario>', 'simulation scenario for --simulate', 'STREAMING')
+  .action(async (prompt: string, options: {json?: boolean; simulate?: boolean; scenario?: string}, command: Command) => {
+    const localOptions = typeof command.opts === 'function' ? command.opts<{json?: boolean; simulate?: boolean; scenario?: string}>() : options;
+    const result = localOptions.simulate
+      ? await runHeadlessSimulation(prompt, normalizeScenario(options.scenario ?? 'STREAMING'))
+      : {
+          sessionId: `headless-${Date.now()}`,
+          prompt,
+          mode: 'provider',
+          status: 'not_configured',
+          message: 'Production providers are not wired yet; use --simulate or interactive dev mode.',
+        };
     if (localOptions.json) {
       process.stdout.write(`${JSON.stringify(result)}\n`);
     } else {
-      process.stdout.write(`${result.message}\n`);
+      const message = 'message' in result ? result.message : `Simulated ${result.status}: ${prompt}`;
+      process.stdout.write(`${message}\n`);
     }
   });
 

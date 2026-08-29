@@ -11,19 +11,24 @@
 - Unicode-aware input editor created.
 - Simulated provider runtime created.
 - Ink TUI shell created with conversation, agent indicators, tabs, status, and input.
-- Unit tests for commands, reducer, input editor, and TUI render.
+- Detail views for agents, tasks, context, diff, and logs started.
+- Headless simulation now executes the simulator and returns canonical events/state.
+- Windows-aware process runner foundation added.
+- Unit tests for commands, reducer, input editor, runtime, simulator, process runner, headless mode, and TUI render/input.
 
 ## IN_PROGRESS
 
 - Milestone 1 polished simulated CLI/TUI.
 - Manual terminal exercise across simulation scenarios.
 - Input hardening for large paste and advanced key combinations.
+- Milestone 2 core runtime boundaries.
+- Terminal teardown polish: PTY capture still shows a trailing border character after Ctrl+C even though the shell prompt returns.
 
 ## NEXT
 
 - Milestone 2 core runtime: cancellation model, lifecycle, error model, effect boundaries.
 - Add render throttling and scrollback windowing.
-- Add process-control utilities with Windows child-process-tree tests.
+- Expand process-control utilities with provider fixtures and abort-signal tests.
 - Expand simulation tests for rate limit, permission, crash, and cancellation.
 
 ## DEFERRED

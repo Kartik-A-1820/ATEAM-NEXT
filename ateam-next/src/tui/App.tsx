@@ -60,25 +60,84 @@ export function App({simulate, scenario}: Props) {
     runtime.handle(parsed as RuntimeCommand);
   };
 
-  const conversationHeight = Math.max(6, rows - 9);
+  const conversationHeight = Math.max(6, rows - 10);
   const entries = visibleEntries(state).slice(-conversationHeight);
   const width = Math.max(40, columns - 4);
 
   return (
     <Box flexDirection="column" width={columns} height={rows}>
       <Header state={state} />
-      <Box flexDirection="column" height={conversationHeight} paddingX={1}>
-        {entries.map(item => (
-          <Text key={item.id}>
-            <Text color={speakerColor(item.speaker)}>{item.speaker}: </Text>
-            {wrapAnsi(item.text, width, {hard: true}).split('\n').join('\n')}
-          </Text>
-        ))}
-      </Box>
+      <MainPane state={state} entries={entries} height={conversationHeight} width={width} />
       <Tabs />
       <InputBox onSubmit={submit} />
     </Box>
   );
+}
+
+function MainPane({state, entries, height, width}: {state: ReturnType<typeof initialState>; entries: ReturnType<typeof visibleEntries>; height: number; width: number}) {
+  if (state.activeTab === 'Agents') {
+    return (
+      <Box flexDirection="column" height={height} paddingX={1}>
+        {Object.values(state.agents).map(agent => (
+          <Text key={agent.id} color={agent.color}>
+            {statusSymbol[agent.availability] ?? 'o'} {agent.displayName} {agent.availability} tasks={agent.runningTaskCount} auth={String(agent.authenticated)}
+            {agent.lastError ? ` error=${agent.lastError}` : ''}
+          </Text>
+        ))}
+      </Box>
+    );
+  }
+  if (state.activeTab === 'Tasks') {
+    const tasks = Object.values(state.tasks);
+    return (
+      <Box flexDirection="column" height={height} paddingX={1}>
+        {tasks.length === 0 ? <Text>No tasks yet.</Text> : tasks.map(task => (
+          <Text key={task.id}>{task.id} {task.status} {task.assignedAgent ?? 'unassigned'} - {task.objective}</Text>
+        ))}
+      </Box>
+    );
+  }
+  if (state.activeTab === 'Logs') {
+    return (
+      <Box flexDirection="column" height={height} paddingX={1}>
+        {state.log.slice(-height).map((line, index) => <Text key={`${index}-${line}`}>{wrapAnsi(line, width, {hard: true})}</Text>)}
+      </Box>
+    );
+  }
+  if (state.activeTab === 'Context') {
+    return (
+      <Box flexDirection="column" height={height} paddingX={1}>
+        <Text>Canonical context packets and provenance-aware memory are planned for Milestone 4.</Text>
+        <Text>Latest user instruction always supersedes the active plan.</Text>
+      </Box>
+    );
+  }
+  if (state.activeTab === 'Diff') {
+    return (
+      <Box flexDirection="column" height={height} paddingX={1}>
+        <Text>Workspace diff inspection is planned for provider/workspace integration.</Text>
+      </Box>
+    );
+  }
+  return (
+    <Box flexDirection="column" height={height} paddingX={1}>
+      {conversationLines(entries, width, height).map(line => (
+        <Text key={line.key} color={line.color}>{line.text}</Text>
+      ))}
+    </Box>
+  );
+}
+
+function conversationLines(entries: ReturnType<typeof visibleEntries>, width: number, maxLines: number): Array<{key: string; text: string; color: ReturnType<typeof speakerColor>}> {
+  const lines: Array<{key: string; text: string; color: ReturnType<typeof speakerColor>}> = [];
+  for (const item of entries) {
+    const prefix = `${item.speaker}: `;
+    const wrapped = wrapAnsi(`${prefix}${item.text}`, width, {hard: true}).split('\n');
+    wrapped.forEach((text, index) => {
+      lines.push({key: `${item.id}-${index}`, text, color: index === 0 ? speakerColor(item.speaker) : 'white'});
+    });
+  }
+  return lines.slice(-maxLines);
 }
 
 function Header({state}: {state: ReturnType<typeof initialState>}) {

@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import type {AgentAvailability, AgentId, PermissionMode, TaskStatus, Verbosity} from './types.js';
+import type {AgentAvailability, AgentId, PermissionMode, TabName, TaskStatus, Verbosity} from './types.js';
 
 const agentId = z.enum(['codex', 'claude', 'agy', 'grok']);
 const availability = z.enum([
@@ -37,6 +37,7 @@ export const eventSchema = z.discriminatedUnion('type', [
   z.object({type: z.literal('VerbosityChanged'), verbosity: z.enum(['QUIET', 'NORMAL', 'VERBOSE', 'TRACE']), at: z.number()}),
   z.object({type: z.literal('PermissionModeChanged'), mode: z.enum(['SAFE', 'STANDARD', 'FULL']), at: z.number()}),
   z.object({type: z.literal('StopRequested'), scope: z.string(), at: z.number()}),
+  z.object({type: z.literal('ViewChanged'), tab: z.enum(['Plan', 'Agents', 'Tasks', 'Diff', 'Context', 'Logs']), at: z.number()}),
 ]);
 
 export type AteamEvent = z.infer<typeof eventSchema>;
@@ -57,5 +58,36 @@ export type RuntimeCommand =
   | {kind: 'setPermissionMode'; mode: PermissionMode}
   | {kind: 'stop'; scope: string}
   | {kind: 'quit'};
+
+export type StopScope =
+  | {kind: 'all'}
+  | {kind: 'current'}
+  | {kind: 'task'; taskId: string}
+  | {kind: 'agent'; agentId: AgentId};
+
+export function parseStopScope(raw = 'current'): StopScope {
+  const value = raw.trim().toLowerCase();
+  if (value === 'all') return {kind: 'all'};
+  if (value === 'current' || value.length === 0) return {kind: 'current'};
+  if (value.startsWith('task:')) return {kind: 'task', taskId: value.slice('task:'.length).toUpperCase()};
+  if (value.startsWith('agent:')) {
+    const agentId = value.slice('agent:'.length);
+    if (agentId === 'codex' || agentId === 'claude' || agentId === 'agy' || agentId === 'grok') {
+      return {kind: 'agent', agentId};
+    }
+  }
+  return {kind: 'current'};
+}
+
+export function tabForCommand(name: string): TabName | undefined {
+  const normalized = name.toLowerCase();
+  if (normalized === 'plan') return 'Plan';
+  if (normalized === 'agents') return 'Agents';
+  if (normalized === 'tasks') return 'Tasks';
+  if (normalized === 'diff') return 'Diff';
+  if (normalized === 'context' || normalized === 'memory') return 'Context';
+  if (normalized === 'logs' || normalized === 'status' || normalized === 'usage' || normalized === 'doctor') return 'Logs';
+  return undefined;
+}
 
 export type {AgentAvailability, AgentId, PermissionMode, TaskStatus, Verbosity};

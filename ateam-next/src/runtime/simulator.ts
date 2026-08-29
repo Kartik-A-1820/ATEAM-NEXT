@@ -21,10 +21,14 @@ export class Simulator {
 
   constructor(private readonly send: (event: AteamEvent) => void) {}
 
-  run(message: string, scenario: SimulationScenario = 'STREAMING'): void {
+  run(message: string, scenario: SimulationScenario = 'STREAMING', options: {emitClassification?: boolean; emitPlan?: boolean} = {}): void {
     const at = Date.now();
-    this.send({type: 'UserMessageClassified', classification: classify(message), at});
-    this.send({type: 'PlanUpdated', summary: 'I found independent workstreams and assigned simulated agents.', at});
+    if (options.emitClassification !== false) {
+      this.send({type: 'UserMessageClassified', classification: classifyMessage(message), at});
+    }
+    if (options.emitPlan !== false) {
+      this.send({type: 'PlanUpdated', summary: 'I found independent workstreams and assigned simulated agents.', at});
+    }
 
     agents.forEach((agent, index) => {
       const taskId = `T${++this.counter}`;
@@ -45,12 +49,11 @@ export class Simulator {
     });
   }
 
-  cancel(scope = 'all'): void {
+  cancel(): void {
     for (const timer of this.timers) {
       clearTimeout(timer);
     }
     this.timers.clear();
-    this.send({type: 'StopRequested', scope, at: Date.now()});
     for (const agent of agents) {
       this.send({type: 'AgentAvailabilityChanged', agentId: agent, availability: 'READY', at: Date.now()});
     }
@@ -97,7 +100,7 @@ export class Simulator {
   }
 }
 
-function classify(message: string): string {
+export function classifyMessage(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes('don\'t') || lower.includes('do not')) return 'NEW_CONSTRAINT';
   if (lower.includes('stop') || lower.includes('cancel')) return 'CANCEL_REQUEST';

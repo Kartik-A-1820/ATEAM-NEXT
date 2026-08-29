@@ -1,8 +1,9 @@
-import {Simulator, type SimulationScenario} from './simulator.js';
-import type {AteamEvent, RuntimeCommand} from '../domain/events.js';
+import {classifyMessage, Simulator, type SimulationScenario} from './simulator.js';
+import {tabForCommand, type AteamEvent, type RuntimeCommand} from '../domain/events.js';
 
 export class RuntimeController {
   private simulator?: Simulator;
+  private active = false;
 
   constructor(private readonly send: (event: AteamEvent) => void, private readonly simulate: boolean, private readonly scenario: SimulationScenario) {
     if (simulate) {
@@ -15,8 +16,18 @@ export class RuntimeController {
     switch (command.kind) {
       case 'submitUserMessage':
         this.send({type: 'UserMessageReceived', message: command.message, at});
+        {
+          const classification = classifyMessage(command.message);
+          this.send({type: 'UserMessageClassified', classification, at});
+          if (this.active && classification !== 'ADDITIONAL_TASK') {
+            this.send({type: 'ContextUpdated', summary: command.message, at});
+            this.send({type: 'PlanUpdated', summary: 'Active plan updated from latest user instruction; obsolete simulated work will be reconsidered.', at});
+            return;
+          }
+        }
         if (this.simulator) {
-          this.simulator.run(command.message, this.scenario);
+          this.active = true;
+          this.simulator.run(command.message, this.scenario, {emitClassification: false});
         }
         return;
       case 'setVerbosity':
@@ -26,17 +37,38 @@ export class RuntimeController {
         this.send({type: 'PermissionModeChanged', mode: command.mode, at});
         return;
       case 'stop':
-        this.simulator?.cancel(command.scope);
+        this.simulator?.cancel();
+        this.active = false;
         this.send({type: 'StopRequested', scope: command.scope, at});
         return;
       case 'slashCommand':
-        this.send({type: 'PlanUpdated', summary: `/${command.name} is registered; detailed view plumbing is in progress.`, at});
+        this.handleSlashCommand(command.name, command.args, at);
         return;
       case 'quit':
-        this.simulator?.cancel('shutdown');
+        this.simulator?.cancel();
+        this.active = false;
+        this.send({type: 'StopRequested', scope: 'shutdown', at});
         return;
       default:
         return;
     }
+  }
+
+  private handleSlashCommand(name: string, args: string[], at: number): void {
+    const tab = tabForCommand(name);
+    if (tab) {
+      this.send({type: 'ViewChanged', tab, at});
+      this.send({type: 'PlanUpdated', summary: `${tab} view selected.`, at});
+      return;
+    }
+    if (name === 'clear') {
+      this.send({type: 'PlanUpdated', summary: 'Clear is registered; conversation pruning will move into persisted session state.', at});
+      return;
+    }
+    if (name === 'resume') {
+      this.send({type: 'PlanUpdated', summary: 'Resume requires SQLite persistence and is planned for Milestone 4.', at});
+      return;
+    }
+    this.send({type: 'RuntimeError', message: args[0] ? `Unknown command /${args[0]}` : `Unknown command /${name}`, at});
   }
 }

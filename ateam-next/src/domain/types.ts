@@ -17,6 +17,7 @@ export type AgentAvailability =
 export type Verbosity = 'QUIET' | 'NORMAL' | 'VERBOSE' | 'TRACE';
 export type PermissionMode = 'SAFE' | 'STANDARD' | 'FULL';
 export type TaskStatus = 'PENDING' | 'READY' | 'RUNNING' | 'BLOCKED' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'INVALIDATED';
+export type TabName = 'Plan' | 'Agents' | 'Tasks' | 'Diff' | 'Context' | 'Logs';
 
 export interface AgentState {
   id: AgentId;
@@ -50,7 +51,7 @@ export interface AppState {
   startedAt: number;
   width: number;
   height: number;
-  activeTab: 'Plan' | 'Agents' | 'Tasks' | 'Diff' | 'Context' | 'Logs';
+  activeTab: TabName;
   verbosity: Verbosity;
   permissionMode: PermissionMode;
   agents: Record<AgentId, AgentState>;

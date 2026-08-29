@@ -1,0 +1,17 @@
+[
+  {
+    "agent": "claude",
+    "role": "TUI input test reviewer",
+    "prompt": "ROLE: TUI input test reviewer.\nOBJECTIVE: Review the new Ateam Next Ink TUI direction and propose concrete tests/implementation improvements for Milestone 1 input reliability: multiline input, large paste, slash command submission, input while simulation streams, cancellation, and resize rendering.\nREPOSITORY/CWD: F:\\\\ATEAM-NEXT\\\\ateam-next.\nRELEVANT FILES: src/tui/App.tsx, src/tui/InputBox.tsx, src/input/editor.ts, src/commands/registry.ts, src/runtime/simulator.ts.\nCONSTRAINTS: Analysis-only. Do not edit files. Windows-first. Avoid broad framework debate; stack is locked for now.\nOWNERSHIP BOUNDARIES: No edits, no commits, no pushes.\nACCEPTANCE CRITERIA: Provide high-signal actionable recommendations and test cases, especially any Ink-specific pitfalls.\nTESTING EXPECTED: Static review only.\nREQUESTED RESPONSE FORMAT: STATUS, FINDINGS, CHANGES, FILES_TOUCHED, TESTS_RUN, RISKS, RECOMMENDATION"
+  },
+  {
+    "agent": "agy",
+    "role": "Runtime cancellation reviewer",
+    "prompt": "ROLE: Runtime cancellation reviewer.\nOBJECTIVE: Review Ateam Next runtime simulation/cancellation design and propose a concrete next-step architecture for Milestone 2: runtime lifecycle, cancellation scopes, canonical events, scheduler-safe task states, and clean shutdown.\nREPOSITORY/CWD: F:\\\\ATEAM-NEXT\\\\ateam-next.\nRELEVANT FILES: src/runtime/runtime.ts, src/runtime/simulator.ts, src/domain/events.ts, src/domain/state.ts.\nCONSTRAINTS: Analysis-only. Do not edit files. Keep provider adapters isolated and deterministic.\nOWNERSHIP BOUNDARIES: No edits, no commits, no pushes.\nACCEPTANCE CRITERIA: Identify bugs/risks and concise recommendations.\nTESTING EXPECTED: Static review only.\nREQUESTED RESPONSE FORMAT: STATUS, FINDINGS, CHANGES, FILES_TOUCHED, TESTS_RUN, RISKS, RECOMMENDATION"
+  },
+  {
+    "agent": "grok",
+    "role": "Windows process-control reviewer",
+    "prompt": "ROLE: Windows process-control reviewer.\nOBJECTIVE: Design the first Windows-aware process-control utility for future provider adapters in Ateam Next. Focus on explicit executable+argv, stdout/stderr separation, cancellation, process tree termination on Windows, and fixture-testability. Do not implement; provide architecture and edge cases.\nREPOSITORY/CWD: F:\\\\ATEAM-NEXT\\\\ateam-next.\nRELEVANT FILES: docs/ARCHITECTURE.md, docs/PROTOCOL.md, src/domain/events.ts.\nCONSTRAINTS: Analysis-only. Do not edit files. Stack is TypeScript/Node.\nOWNERSHIP BOUNDARIES: No edits, no commits, no pushes.\nACCEPTANCE CRITERIA: Concrete design recommendations for the next implementation slice.\nTESTING EXPECTED: Static review only.\nREQUESTED RESPONSE FORMAT: STATUS, FINDINGS, CHANGES, FILES_TOUCHED, TESTS_RUN, RISKS, RECOMMENDATION"
+  }
+]

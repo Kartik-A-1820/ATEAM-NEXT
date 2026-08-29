@@ -11,6 +11,7 @@ Ateam owns orchestration. Providers are workers behind adapters; no provider con
 - Event protocol: `src/domain/events.ts`, provider-neutral and validated with Zod.
 - Application state: `src/domain/state.ts`, deterministic reducer.
 - Runtime: `src/runtime`, currently simulation-first.
+- Process control: `src/process`, explicit executable/argv spawning with stdout/stderr separation and Windows-aware process-tree termination.
 - Provider adapters: interface defined in `src/domain/events.ts`; production implementations are future work.
 - Persistence, planner, task graph, scheduler, permissions, memory, and context compiler: documented protocol boundaries now, implementation begins after the simulated TUI stabilizes.
 
@@ -47,3 +48,7 @@ Simulation exists so terminal behavior can be tested without consuming provider 
 ## Near-Term Boundaries
 
 Milestone 2 should keep business logic outside Ink components. The reducer, command registry, simulator, provider adapters, permissions, and process control must remain testable without a real terminal.
+
+## Process Control
+
+Provider adapters must use explicit executable paths plus argument arrays. Prompts and large payloads should go through stdin where provider CLIs support it. The initial process runner captures stdout/stderr separately, supports timeout and abort-driven cancellation, hides child windows on Windows, and uses `taskkill.exe /pid <pid> /t /f` for Windows process trees.

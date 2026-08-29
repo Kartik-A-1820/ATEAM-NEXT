@@ -18,6 +18,7 @@ npx tsx src/cli.tsx dev --simulate
 Useful scenarios:
 
 ```powershell
+npx tsx src/cli.tsx run "Refactor auth" --simulate --json
 npx tsx src/cli.tsx dev --simulate --scenario TOOL_HEAVY
 npx tsx src/cli.tsx dev --simulate --scenario RATE_LIMIT
 npx tsx src/cli.tsx dev --simulate --scenario PERMISSION_REQUEST
