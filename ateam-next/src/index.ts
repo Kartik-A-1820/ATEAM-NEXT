@@ -10,3 +10,5 @@ export {parseCodexJsonl} from './providers/codex/parser.js';
 export {PermissionPolicy} from './permissions/policy.js';
 export {createInitialTaskGraph, readyTasks, applyConstraint} from './planner/taskGraph.js';
 export {scheduleTask} from './scheduler/scheduler.js';
+export {MemoryStore} from './memory/memory.js';
+export {compileContextPacket} from './context/compiler.js';

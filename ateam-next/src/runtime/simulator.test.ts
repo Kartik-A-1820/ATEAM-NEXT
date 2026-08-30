@@ -30,4 +30,17 @@ describe('Simulator', () => {
     expect(events.some(event => event.type === 'TaskCreated')).toBe(true);
     vi.useRealTimers();
   });
+
+  it('marks active simulated tasks cancelled', async () => {
+    vi.useFakeTimers();
+    const events: AteamEvent[] = [];
+    const simulator = new Simulator(event => events.push(event));
+
+    simulator.run('Long task', 'SLOW');
+    await vi.advanceTimersByTimeAsync(130);
+    simulator.cancel();
+
+    expect(events.some(event => event.type === 'TaskStatusChanged' && event.status === 'CANCELLED')).toBe(true);
+    vi.useRealTimers();
+  });
 });

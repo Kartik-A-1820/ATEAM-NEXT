@@ -20,6 +20,7 @@ Ateam uses provider-neutral events. The UI consumes state derived from these eve
 - `TaskInvalidated`
 - `PlanUpdated`
 - `ContextUpdated`
+- `MemoryUpdated`
 - `RateLimited`
 - `RuntimeError`
 - `VerbosityChanged`
@@ -66,6 +67,23 @@ Ateam owns:
 
 Provider sessions are projections or caches, not the source of truth.
 
+## Memory Events
+
+`MemoryUpdated` records provenance-aware knowledge in the canonical stream. It includes:
+
+- stable memory ID;
+- category: `FACT`, `HYPOTHESIS`, `DECISION`, `USER_CONSTRAINT`, `AGENT_FINDING`, or `TEST_RESULT`;
+- verification: `UNVERIFIED`, `SUPPORTED`, `VERIFIED`, `REJECTED`, or `STALE`;
+- optional source agent/task;
+- evidence references;
+- optional confidence.
+
+SQLite projects these events into the `memories` table for querying, but replaying the event log remains authoritative.
+
+## Context Packets
+
+Context packets are compiled by Ateam, not by provider adapters. A packet contains the task, shared objective summary, current constraints, relevant non-rejected memory, upstream results, acceptance criteria, permission policy, and expected output. Provider adapters translate the packet into provider-specific prompt/protocol fields.
+
 ## Cancellation Scope
 
 `StopRequested.scope` currently accepts:
@@ -76,6 +94,8 @@ Provider sessions are projections or caches, not the source of truth.
 - `agent:<agentId>`
 
 The reducer cancels matching cancellable tasks and leaves completed work intact.
+
+Cancel-like live user steering emits `StopRequested` immediately, rather than waiting for current tasks to finish.
 
 ## Permission Decisions
 

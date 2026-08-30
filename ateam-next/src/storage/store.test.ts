@@ -16,4 +16,37 @@ describe('AteamStore', () => {
     expect(store.eventsForSession('s1').map(item => item.event.type)).toEqual(['UserMessageReceived', 'PlanUpdated']);
     store.close();
   });
+
+  it('projects messages tasks and memories into queryable tables', () => {
+    const store = new AteamStore(join(mkdtempSync(join(tmpdir(), 'ateam-store-')), 'test.sqlite'));
+    store.createSession('s1', 'Projection session', 1);
+    store.appendEvent('s1', {type: 'UserMessageReceived', message: 'fix auth', at: 2});
+    store.appendEvent('s1', {type: 'PlanUpdated', summary: 'Plan created', at: 3});
+    store.appendEvent('s1', {type: 'TaskCreated', taskId: 'T1', objective: 'Investigate auth', at: 4});
+    store.appendEvent('s1', {type: 'TaskAssigned', taskId: 'T1', agentId: 'codex', reason: 'best fit', at: 5});
+    store.appendEvent('s1', {type: 'TaskStatusChanged', taskId: 'T1', status: 'COMPLETED', at: 6});
+    store.appendEvent('s1', {
+      type: 'MemoryUpdated',
+      memoryId: 'M1',
+      category: 'USER_CONSTRAINT',
+      content: 'Do not change public API',
+      verification: 'VERIFIED',
+      evidence: ['user instruction'],
+      at: 7,
+    });
+
+    expect(store.messagesForSession('s1').map(message => [message.speaker, message.text])).toEqual([
+      ['You', 'fix auth'],
+      ['Ateam', 'Plan created'],
+    ]);
+    expect(store.tasksForSession('s1')[0]).toMatchObject({id: 'T1', assignedAgent: 'codex', status: 'COMPLETED'});
+    expect(store.memoriesForSession('s1')[0]).toMatchObject({
+      externalId: 'M1',
+      category: 'USER_CONSTRAINT',
+      content: 'Do not change public API',
+      verificationState: 'VERIFIED',
+      evidence: ['user instruction'],
+    });
+    store.close();
+  });
 });

@@ -79,29 +79,38 @@ export function reduce(state: AppState, event: AteamEvent): AppState {
       return next;
     case 'TaskCreated':
       next.tasks[event.taskId] = {id: event.taskId, objective: event.objective, assignedAgent: event.assignedAgent, dependencies: event.dependencies ?? [], status: 'READY', priority: 50};
+      recomputeAgentWorkload(next);
+      next.running = hasActiveTasks(next);
       return next;
     case 'TaskAssigned':
       if (next.tasks[event.taskId]) {
         next.tasks[event.taskId] = {...next.tasks[event.taskId], assignedAgent: event.agentId};
       }
+      recomputeAgentWorkload(next);
       next.conversation.push(entry('Ateam', `${event.taskId} assigned to ${event.agentId}: ${event.reason}`, 'VERBOSE'));
       return next;
     case 'TaskInvalidated':
       if (next.tasks[event.taskId]) {
         next.tasks[event.taskId] = {...next.tasks[event.taskId], status: 'INVALIDATED'};
       }
+      recomputeAgentWorkload(next);
+      next.running = hasActiveTasks(next);
       return next;
     case 'TaskStatusChanged':
       if (next.tasks[event.taskId]) {
         next.tasks[event.taskId] = {...next.tasks[event.taskId], status: event.status};
       }
-      next.running = Object.values(next.tasks).some(task => task.status === 'RUNNING' || task.status === 'READY');
+      recomputeAgentWorkload(next);
+      next.running = hasActiveTasks(next);
       return next;
     case 'PlanUpdated':
       next.conversation.push(entry('Ateam', event.summary, 'NORMAL'));
       return next;
     case 'ContextUpdated':
       next.conversation.push(entry('System', `Context updated: ${event.summary}`, 'VERBOSE'));
+      return next;
+    case 'MemoryUpdated':
+      next.conversation.push(entry('System', `Memory ${event.memoryId} ${event.verification}: ${event.content}`, 'VERBOSE'));
       return next;
     case 'RateLimited': {
       const current = next.agents[event.agentId];
@@ -137,7 +146,8 @@ export function reduce(state: AppState, event: AteamEvent): AppState {
         const agent = next.agents[scope.agentId];
         next.agents[scope.agentId] = {...agent, availability: 'READY', runningTaskCount: 0};
       }
-      next.running = Object.values(next.tasks).some(task => task.status === 'RUNNING' || task.status === 'READY' || task.status === 'PENDING');
+      recomputeAgentWorkload(next);
+      next.running = hasActiveTasks(next);
       next.conversation.push(entry('System', `Stop requested for ${event.scope}.`, 'QUIET'));
       return next;
     }
@@ -156,4 +166,19 @@ export function visibleEntries(state: AppState): ConversationEntry[] {
   const rank: Record<Verbosity, number> = {QUIET: 0, NORMAL: 1, VERBOSE: 2, TRACE: 3};
   const max = rank[state.verbosity];
   return state.conversation.filter(item => rank[item.level] <= max);
+}
+
+function hasActiveTasks(state: AppState): boolean {
+  return Object.values(state.tasks).some(task => task.status === 'RUNNING' || task.status === 'READY' || task.status === 'PENDING' || task.status === 'BLOCKED');
+}
+
+function recomputeAgentWorkload(state: AppState): void {
+  for (const agent of Object.values(state.agents)) {
+    agent.runningTaskCount = 0;
+  }
+  for (const task of Object.values(state.tasks)) {
+    if (task.assignedAgent && task.status === 'RUNNING') {
+      state.agents[task.assignedAgent].runningTaskCount += 1;
+    }
+  }
 }

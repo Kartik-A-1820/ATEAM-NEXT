@@ -20,6 +20,12 @@
 - Streaming process runner added for future provider adapters.
 - Permission policy, initial task graph, and deterministic scheduler skeletons added.
 - Planner/scheduler now emit canonical task creation and assignment events into simulated runtime.
+- Context compiler and provenance-aware in-memory memory store added.
+- `MemoryUpdated` canonical event added for user constraints and future agent findings.
+- SQLite now projects canonical events into queryable messages, tasks, and memories.
+- Live cancel steering now emits cancellation immediately while simulated work is active.
+- Simulated cancellation now marks active tasks cancelled and restores agent availability.
+- Reducer now derives agent running task counts from canonical task state.
 - Unit tests for commands, reducer, input editor, runtime, simulator, process runner, headless mode, and TUI render/input.
 
 ## IN_PROGRESS
@@ -37,19 +43,18 @@
 ## NEXT
 
 - Milestone 2 core runtime: lifecycle, error model, effect boundaries.
-- Add context compiler and provenance-aware memory.
 - Add provider-streaming integration for Codex beyond fixture parsing.
 - Add render throttling and scrollback windowing.
 - Expand process-control utilities with provider fixtures and abort-signal tests.
 - Expand simulation tests for rate limit, permission, crash, and cancellation.
+- Wire context packets into real provider execution.
+- Persist TUI sessions, not only headless simulation sessions.
 
 ## DEFERRED
 
-- SQLite persistence and resume.
-- Production Codex adapter.
-- Planner and mutable DAG.
-- Scheduler.
-- Live steering replan/invalidation engine.
+- Full production Codex adapter.
+- Full planner and mutable DAG revision engine.
+- Advanced scheduler priority changes and user provider policies.
 - Remaining provider adapters.
 - Worktree isolation.
 - Single-binary distribution.

@@ -16,6 +16,8 @@ const availability = z.enum([
   'DISABLED',
   'UNKNOWN',
 ]);
+const memoryCategory = z.enum(['FACT', 'HYPOTHESIS', 'DECISION', 'USER_CONSTRAINT', 'AGENT_FINDING', 'TEST_RESULT']);
+const verificationState = z.enum(['UNVERIFIED', 'SUPPORTED', 'VERIFIED', 'REJECTED', 'STALE']);
 
 export const eventSchema = z.discriminatedUnion('type', [
   z.object({type: z.literal('SessionStarted'), sessionId: z.string(), at: z.number()}),
@@ -33,6 +35,18 @@ export const eventSchema = z.discriminatedUnion('type', [
   z.object({type: z.literal('TaskStatusChanged'), taskId: z.string(), status: z.enum(['PENDING', 'READY', 'RUNNING', 'BLOCKED', 'COMPLETED', 'FAILED', 'CANCELLED', 'INVALIDATED']), at: z.number()}),
   z.object({type: z.literal('PlanUpdated'), summary: z.string(), at: z.number()}),
   z.object({type: z.literal('ContextUpdated'), summary: z.string(), at: z.number()}),
+  z.object({
+    type: z.literal('MemoryUpdated'),
+    memoryId: z.string(),
+    category: memoryCategory,
+    content: z.string(),
+    verification: verificationState,
+    sourceAgent: agentId.optional(),
+    sourceTask: z.string().optional(),
+    evidence: z.array(z.string()).optional(),
+    confidence: z.number().min(0).max(1).optional(),
+    at: z.number(),
+  }),
   z.object({type: z.literal('RateLimited'), agentId, resetHint: z.string().optional(), at: z.number()}),
   z.object({type: z.literal('RuntimeError'), message: z.string(), at: z.number()}),
   z.object({type: z.literal('VerbosityChanged'), verbosity: z.enum(['QUIET', 'NORMAL', 'VERBOSE', 'TRACE']), at: z.number()}),

@@ -12,13 +12,12 @@ Ateam owns orchestration. Providers are workers behind adapters; no provider con
 - Application state: `src/domain/state.ts`, deterministic reducer.
 - Runtime: `src/runtime`, currently simulation-first.
 - Process control: `src/process`, explicit executable/argv spawning with stdout/stderr separation and Windows-aware process-tree termination.
-- Provider adapters: interface defined in `src/domain/events.ts`; production implementations are future work.
 - Persistence: `src/storage`, using SQLite through `better-sqlite3` with migrations and event replay.
 - Provider adapters: `src/providers`, starting with Codex JSONL parser fixtures and probe/run scaffolding.
 - Permissions: `src/permissions`, canonical SAFE/STANDARD/FULL capability decisions.
 - Planner/task graph: `src/planner`, deterministic task DAG skeleton with constraint invalidation.
 - Scheduler: `src/scheduler`, deterministic provider selection heuristics.
-- Memory and context compiler: documented protocol boundaries now, implementation follows the core runtime slice.
+- Memory and context compiler: `src/memory` tracks provenance-aware knowledge; `src/context` compiles task-scoped context packets.
 
 ## Runtime Flow
 
@@ -64,6 +63,22 @@ On Windows, command resolution prefers spawnable `.exe`, `.cmd`, and `.bat` entr
 
 SQLite is authoritative for sessions and event replay. Current tables include `sessions`, `events`, `messages`, `tasks`, and `memories`. The current implementation persists canonical events for headless simulated runs and can list/resume sessions from the event log.
 
+`appendEvent` also maintains queryable projections for:
+
+- user/Ateam/system messages;
+- task creation, assignment, status, and invalidation;
+- provenance-aware memories emitted through `MemoryUpdated`.
+
+The event log remains the source of truth. Projection tables exist for fast CLI/TUI queries and can be rebuilt from events if later migrations need it.
+
+## Memory And Context
+
+Memory records are categorized as facts, hypotheses, decisions, user constraints, agent findings, and test results. Every record carries verification state and evidence references so one provider finding cannot silently become project truth.
+
+The context compiler creates provider/task-specific packets containing the task, shared objective summary, current user constraints, relevant non-rejected memory, upstream results, acceptance criteria, and permission policy. Providers receive these packets through adapters; UI and scheduler code do not depend on provider-specific context formats.
+
 ## Planner And Scheduler
 
 The first planner is intentionally deterministic. It creates capability-oriented tasks rather than assigning provider names. The scheduler then picks providers from current agent state, task type, workload, and user restrictions. This preserves graceful degradation from four providers to one.
+
+Live user steering currently records new constraints into memory, updates context, invalidates affected implementation work in the active task graph, and handles cancel-like steering as immediate cancellation.

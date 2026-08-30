@@ -1,12 +1,15 @@
 import {classifyMessage, Simulator, type SimulationScenario} from './simulator.js';
 import {tabForCommand, type AteamEvent, type RuntimeCommand} from '../domain/events.js';
-import {createInitialTaskGraph} from '../planner/taskGraph.js';
+import {applyConstraint, createInitialTaskGraph, type TaskGraph} from '../planner/taskGraph.js';
 import {initialState} from '../domain/state.js';
 import {scheduleTask} from '../scheduler/scheduler.js';
+import {MemoryStore} from '../memory/memory.js';
 
 export class RuntimeController {
   private simulator?: Simulator;
   private active = false;
+  private readonly memories = new MemoryStore();
+  private currentGraph?: TaskGraph;
 
   constructor(private readonly send: (event: AteamEvent) => void, private readonly simulate: boolean, private readonly scenario: SimulationScenario) {
     if (simulate) {
@@ -23,14 +26,32 @@ export class RuntimeController {
           const classification = classifyMessage(command.message);
           this.send({type: 'UserMessageClassified', classification, at});
           if (this.active && classification !== 'ADDITIONAL_TASK') {
+            if (classification === 'NEW_CONSTRAINT') {
+              const memory = this.memories.add({category: 'USER_CONSTRAINT', content: command.message, verification: 'VERIFIED', evidence: ['live user steering']});
+              this.send({
+                type: 'MemoryUpdated',
+                memoryId: memory.id,
+                category: memory.category,
+                content: memory.content,
+                verification: memory.verification,
+                evidence: memory.evidence,
+                at,
+              });
+              this.applyLiveConstraint(command.message, at);
+            }
+            if (classification === 'CANCEL_REQUEST') {
+              this.simulator?.cancel();
+              this.active = false;
+              this.send({type: 'StopRequested', scope: 'current', at});
+            }
             this.send({type: 'ContextUpdated', summary: command.message, at});
             this.send({type: 'PlanUpdated', summary: 'Active plan updated from latest user instruction; obsolete simulated work will be reconsidered.', at});
             return;
           }
         }
         if (this.simulator) {
-          this.planAndSchedule(command.message, at);
           this.active = true;
+          this.planAndSchedule(command.message, at);
           this.simulator.run(command.message, this.scenario, {emitClassification: false});
         }
         return;
@@ -78,7 +99,11 @@ export class RuntimeController {
 
   private planAndSchedule(objective: string, at: number): void {
     const graph = createInitialTaskGraph(objective);
+    this.currentGraph = graph;
     const state = initialState();
+    for (const constraint of this.memories.constraints()) {
+      this.send({type: 'ContextUpdated', summary: constraint, at});
+    }
     for (const task of graph.tasks) {
       this.send({type: 'TaskCreated', taskId: `P-${task.id}`, objective: task.objective, dependencies: task.dependencies.map(dep => `P-${dep}`), at});
       const assignment = scheduleTask(task, state.agents);
@@ -87,5 +112,16 @@ export class RuntimeController {
       }
     }
     this.send({type: 'PlanUpdated', summary: `Plan created for: ${objective}`, at});
+  }
+
+  private applyLiveConstraint(constraint: string, at: number): void {
+    if (!this.currentGraph) return;
+    const previous = new Map(this.currentGraph.tasks.map(task => [task.id, task.status]));
+    this.currentGraph = applyConstraint(this.currentGraph, constraint);
+    for (const task of this.currentGraph.tasks) {
+      if (task.status === 'INVALIDATED' && previous.get(task.id) !== 'INVALIDATED') {
+        this.send({type: 'TaskInvalidated', taskId: `P-${task.id}`, reason: constraint, at});
+      }
+    }
   }
 }

@@ -1,0 +1,18 @@
+{
+  "tasks": [
+    {
+      "id": "claude-memory-persistence-review",
+      "agent": "claude",
+      "role": "persistence and memory reviewer",
+      "timeout_seconds": 300,
+      "prompt": "ROLE\nYou are an independent peer engineer reviewing Ateam Next persistence and memory/context design.\n\nOBJECTIVE\nReview the current TypeScript project for the next implementation slice: queryable persistence projections for messages/tasks/memories and provenance-aware MemoryUpdated events.\n\nREPOSITORY/CWD\nF:\\ATEAM-NEXT\\ateam-next\n\nRELEVANT FILES\nsrc/storage/store.ts\nsrc/storage/store.test.ts\nsrc/domain/events.ts\nsrc/memory/memory.ts\nsrc/context/compiler.ts\nsrc/runtime/runtime.ts\ndocs/ARCHITECTURE.md\ndocs/PROTOCOL.md\ndocs/ROADMAP.md\n\nCONSTRAINTS\nAnalysis only. Do not edit files. Do not commit. Do not push. Do not run commands that consume AI provider quota. Use local file inspection and reasoning.\n\nACCEPTANCE CRITERIA\nFind concrete risks or missing pieces in persistence projection, memory provenance, event schema, and runtime ownership. Prefer file/line-specific findings. Reject speculative generic advice.\n\nREQUESTED RESPONSE FORMAT\nSTATUS\nFINDINGS\nCHANGES\nFILES_TOUCHED\nTESTS_RUN\nRISKS\nRECOMMENDATION"
+    },
+    {
+      "id": "agy-runtime-steering-review",
+      "agent": "agy",
+      "role": "runtime and live-steering reviewer",
+      "timeout_seconds": 300,
+      "prompt": "ROLE\nYou are an independent peer engineer reviewing Ateam Next runtime boundaries and live user steering.\n\nOBJECTIVE\nReview whether the current runtime/event/state architecture supports immediate user steering while background simulated work runs, and identify concrete improvements for the next slice without editing.\n\nREPOSITORY/CWD\nF:\\ATEAM-NEXT\\ateam-next\n\nRELEVANT FILES\nsrc/runtime/runtime.ts\nsrc/runtime/simulator.ts\nsrc/runtime/runtime.test.ts\nsrc/domain/events.ts\nsrc/domain/state.ts\nsrc/planner/taskGraph.ts\nsrc/scheduler/scheduler.ts\nsrc/permissions/policy.ts\nsrc/tui/App.tsx\n\nCONSTRAINTS\nAnalysis only. Do not edit files. Do not commit. Do not push. Do not run commands that consume AI provider quota. Use local inspection and reasoning.\n\nACCEPTANCE CRITERIA\nProvide concrete bugs, edge cases, or boundary risks around active user input, cancellation, plan invalidation, and state transitions. Prefer reproducible findings and test suggestions.\n\nREQUESTED RESPONSE FORMAT\nSTATUS\nFINDINGS\nCHANGES\nFILES_TOUCHED\nTESTS_RUN\nRISKS\nRECOMMENDATION"
+    }
+  ]
+}

@@ -17,6 +17,7 @@ const agents: AgentId[] = ['codex', 'claude', 'agy', 'grok'];
 
 export class Simulator {
   private timers = new Set<NodeJS.Timeout>();
+  private activeTasks = new Map<string, AgentId>();
   private counter = 0;
 
   constructor(private readonly send: (event: AteamEvent) => void) {}
@@ -43,6 +44,7 @@ export class Simulator {
         }
         this.send({type: 'TaskCreated', taskId, objective: simulatedObjective(agent, message), assignedAgent: agent, at: Date.now()});
         this.send({type: 'AgentAvailabilityChanged', agentId: agent, availability: 'BUSY', at: Date.now()});
+        this.activeTasks.set(taskId, agent);
         this.send({type: 'TaskStatusChanged', taskId, status: 'RUNNING', at: Date.now()});
         this.stream(agent, taskId, scenario);
       });
@@ -54,6 +56,10 @@ export class Simulator {
       clearTimeout(timer);
     }
     this.timers.clear();
+    for (const taskId of this.activeTasks.keys()) {
+      this.send({type: 'TaskStatusChanged', taskId, status: 'CANCELLED', at: Date.now()});
+    }
+    this.activeTasks.clear();
     for (const agent of agents) {
       this.send({type: 'AgentAvailabilityChanged', agentId: agent, availability: 'READY', at: Date.now()});
     }
@@ -70,6 +76,7 @@ export class Simulator {
         if (scenario === 'CRASH' && index === 1) {
           this.send({type: 'RuntimeError', message: `${agent} simulated process crash`, at: Date.now()});
           this.send({type: 'TaskStatusChanged', taskId, status: 'FAILED', at: Date.now()});
+          this.activeTasks.delete(taskId);
           this.send({type: 'AgentAvailabilityChanged', agentId: agent, availability: 'UNHEALTHY', reason: 'simulated process crash', at: Date.now()});
           return;
         }
@@ -85,6 +92,7 @@ export class Simulator {
         this.send({type: 'AgentStreamDelta', agentId: agent, taskId, delta, at: Date.now()});
         if (index === chunks.length - 1) {
           this.send({type: 'TaskStatusChanged', taskId, status: 'COMPLETED', at: Date.now()});
+          this.activeTasks.delete(taskId);
           this.send({type: 'AgentAvailabilityChanged', agentId: agent, availability: 'READY', at: Date.now()});
         }
       });

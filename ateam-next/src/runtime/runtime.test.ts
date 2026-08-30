@@ -32,8 +32,20 @@ describe('RuntimeController', () => {
     await vi.runAllTimersAsync();
 
     expect(events.some(event => event.type === 'ContextUpdated')).toBe(true);
+    expect(events.some(event => event.type === 'MemoryUpdated' && event.category === 'USER_CONSTRAINT')).toBe(true);
+    expect(events.some(event => event.type === 'TaskInvalidated' && event.taskId === 'P-T2')).toBe(true);
     expect(events.filter(event => event.type === 'PlanUpdated').length).toBeGreaterThanOrEqual(2);
     expect(events.filter(event => event.type === 'TaskCreated' && !event.taskId.startsWith('P-'))).toHaveLength(4);
     vi.useRealTimers();
+  });
+
+  it('treats cancel steering as immediate cancellation', () => {
+    const events: AteamEvent[] = [];
+    const runtime = new RuntimeController(event => events.push(event), true, 'SLOW');
+
+    runtime.handle({kind: 'submitUserMessage', message: 'Refactor auth'});
+    runtime.handle({kind: 'submitUserMessage', message: 'cancel that work'});
+
+    expect(events.some(event => event.type === 'StopRequested' && event.scope === 'current')).toBe(true);
   });
 });

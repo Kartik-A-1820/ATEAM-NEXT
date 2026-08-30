@@ -45,8 +45,12 @@ export function applyConstraint(graph: TaskGraph, constraint: string): TaskGraph
   return {
     ...graph,
     constraints: [...graph.constraints, constraint],
-    tasks: graph.tasks.map(task => task.status === 'RUNNING' && task.type === 'implementation' ? {...task, status: 'INVALIDATED'} : task),
+    tasks: graph.tasks.map(task => shouldInvalidateForConstraint(task) ? {...task, status: 'INVALIDATED'} : task),
   };
+}
+
+function shouldInvalidateForConstraint(task: PlannedTask): boolean {
+  return task.type === 'implementation' && (task.status === 'PENDING' || task.status === 'READY' || task.status === 'RUNNING' || task.status === 'BLOCKED');
 }
 
 function task(id: string, objective: string, type: PlannedTask['type'], dependencies: string[], priority: number, requiredCapabilities: Capability[]): PlannedTask {

@@ -46,4 +46,14 @@ describe('state reducer', () => {
     expect(state.tasks.T1.dependencies).toEqual(['T0']);
     expect(state.tasks.T1.status).toBe('INVALIDATED');
   });
+
+  it('derives agent running task counts from task state', () => {
+    let state = initialState();
+    state = reduce(state, {type: 'TaskCreated', taskId: 'T1', objective: 'implement', assignedAgent: 'codex', at: 1});
+    state = reduce(state, {type: 'TaskStatusChanged', taskId: 'T1', status: 'RUNNING', at: 2});
+    expect(state.agents.codex.runningTaskCount).toBe(1);
+
+    state = reduce(state, {type: 'TaskStatusChanged', taskId: 'T1', status: 'COMPLETED', at: 3});
+    expect(state.agents.codex.runningTaskCount).toBe(0);
+  });
 });
