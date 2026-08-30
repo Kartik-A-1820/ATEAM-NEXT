@@ -6,6 +6,7 @@ export {runProcess, streamProcess, terminateProcessTree} from './process/runner.
 export {AteamStore} from './storage/store.js';
 export {runDoctor} from './doctor/doctor.js';
 export {CodexAdapter} from './providers/codex/adapter.js';
+export {normalizeCodexDoctor} from './providers/codex/adapter.js';
 export {parseCodexJsonl} from './providers/codex/parser.js';
 export {PermissionPolicy} from './permissions/policy.js';
 export {createInitialTaskGraph, readyTasks, applyConstraint} from './planner/taskGraph.js';

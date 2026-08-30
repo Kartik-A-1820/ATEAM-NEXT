@@ -29,6 +29,7 @@
 - Simulated cancellation now marks active tasks cancelled and restores agent availability.
 - Reducer now derives agent running task counts from canonical task state.
 - Reducer running state now reflects active/blocked execution instead of planned-but-idle tasks.
+- Codex adapter doctor normalization distinguishes auth failures from non-blocking terminal/Windows warnings.
 - Unit tests for commands, reducer, input editor, runtime, simulator, process runner, headless mode, and TUI render/input.
 
 ## IN_PROGRESS
@@ -47,6 +48,7 @@
 
 - Milestone 2 core runtime: lifecycle, error model, effect boundaries.
 - Add provider-streaming integration for Codex beyond fixture parsing.
+- Add provider health checks to the TUI agent registry at startup.
 - Add render throttling and scrollback windowing.
 - Expand process-control utilities with provider fixtures and abort-signal tests.
 - Expand simulation tests for rate limit, permission, crash, and cancellation.
