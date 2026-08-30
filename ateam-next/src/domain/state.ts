@@ -169,7 +169,7 @@ export function visibleEntries(state: AppState): ConversationEntry[] {
 }
 
 function hasActiveTasks(state: AppState): boolean {
-  return Object.values(state.tasks).some(task => task.status === 'RUNNING' || task.status === 'READY' || task.status === 'PENDING' || task.status === 'BLOCKED');
+  return Object.values(state.tasks).some(task => task.status === 'RUNNING' || task.status === 'BLOCKED');
 }
 
 function recomputeAgentWorkload(state: AppState): void {

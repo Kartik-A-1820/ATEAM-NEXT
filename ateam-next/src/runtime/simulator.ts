@@ -51,17 +51,22 @@ export class Simulator {
     });
   }
 
-  cancel(): void {
+  cancel(options: {emitEvents?: boolean} = {}): void {
+    const emitEvents = options.emitEvents !== false;
     for (const timer of this.timers) {
       clearTimeout(timer);
     }
     this.timers.clear();
-    for (const taskId of this.activeTasks.keys()) {
-      this.send({type: 'TaskStatusChanged', taskId, status: 'CANCELLED', at: Date.now()});
+    if (emitEvents) {
+      for (const taskId of this.activeTasks.keys()) {
+        this.send({type: 'TaskStatusChanged', taskId, status: 'CANCELLED', at: Date.now()});
+      }
     }
     this.activeTasks.clear();
-    for (const agent of agents) {
-      this.send({type: 'AgentAvailabilityChanged', agentId: agent, availability: 'READY', at: Date.now()});
+    if (emitEvents) {
+      for (const agent of agents) {
+        this.send({type: 'AgentAvailabilityChanged', agentId: agent, availability: 'READY', at: Date.now()});
+      }
     }
   }
 

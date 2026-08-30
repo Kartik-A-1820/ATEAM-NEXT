@@ -79,6 +79,11 @@ export class RuntimeController {
     }
   }
 
+  shutdown(): void {
+    this.simulator?.cancel({emitEvents: false});
+    this.active = false;
+  }
+
   private handleSlashCommand(name: string, args: string[], at: number): void {
     const tab = tabForCommand(name);
     if (tab) {

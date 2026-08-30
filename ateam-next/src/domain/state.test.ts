@@ -56,4 +56,13 @@ describe('state reducer', () => {
     state = reduce(state, {type: 'TaskStatusChanged', taskId: 'T1', status: 'COMPLETED', at: 3});
     expect(state.agents.codex.runningTaskCount).toBe(0);
   });
+
+  it('does not treat merely ready planned tasks as active execution', () => {
+    let state = initialState();
+    state = reduce(state, {type: 'TaskCreated', taskId: 'P-T1', objective: 'plan', assignedAgent: 'claude', at: 1});
+    expect(state.running).toBe(false);
+
+    state = reduce(state, {type: 'TaskStatusChanged', taskId: 'P-T1', status: 'RUNNING', at: 2});
+    expect(state.running).toBe(true);
+  });
 });

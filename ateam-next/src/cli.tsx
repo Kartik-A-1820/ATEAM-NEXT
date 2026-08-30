@@ -75,7 +75,7 @@ program.command('sessions').description('list sessions').option('--json', 'emit 
   process.stdout.write(options.json ? `${JSON.stringify({sessions}, null, 2)}\n` : formatSessionList(sessions));
   store.close();
 });
-program.command('resume').description('resume a session').argument('[sessionId]').option('--json', 'emit structured JSON').action((sessionId: string | undefined, options: {json?: boolean}) => {
+program.command('resume').description('resume a session').argument('[sessionId]').option('--json', 'emit structured JSON').action(async (sessionId: string | undefined, options: {json?: boolean}) => {
   const store = new AteamStore();
   const target = sessionId ? store.getSession(sessionId) : store.latestSession();
   if (!target) {
@@ -85,7 +85,13 @@ program.command('resume').description('resume a session').argument('[sessionId]'
   }
   const state = replaySession(store, target.id);
   const payload = {session: target, messages: state?.conversation ?? [], tasks: state?.tasks ?? {}};
-  process.stdout.write(options.json ? `${JSON.stringify(payload, null, 2)}\n` : `Resumed ${target.id}: ${target.title}\n${(state?.conversation ?? []).map(item => `${item.speaker}: ${item.text}`).join('\n')}\n`);
+  if (options.json) {
+    process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+    store.close();
+    return;
+  }
+  const instance = render(<App simulate={true} scenario="STREAMING" store={store} initial={state} sessionMode="resume" />);
+  await instance.waitUntilExit();
   store.close();
 });
 program.command('config').description('show configuration').action(() => {

@@ -4,6 +4,7 @@ import wrapAnsi from 'wrap-ansi';
 import {RuntimeController} from '../runtime/runtime.js';
 import type {SimulationScenario} from '../runtime/simulator.js';
 import {initialState, reduce, visibleEntries} from '../domain/state.js';
+import type {AppState} from '../domain/types.js';
 import type {AteamEvent, RuntimeCommand} from '../domain/events.js';
 import {commandHelp, parseInput} from '../commands/registry.js';
 import {InputBox} from './InputBox.js';
@@ -13,6 +14,8 @@ interface Props {
   simulate: boolean;
   scenario: SimulationScenario;
   store?: AteamStore;
+  initial?: AppState;
+  sessionMode?: 'new' | 'resume';
 }
 
 const statusSymbol: Record<string, string> = {
@@ -24,10 +27,10 @@ const statusSymbol: Record<string, string> = {
   UNHEALTHY: '!',
 };
 
-export function App({simulate, scenario, store}: Props) {
+export function App({simulate, scenario, store, initial, sessionMode = 'new'}: Props) {
   const {exit} = useApp();
   const {columns, rows} = useWindowSize();
-  const [state, setState] = useState(() => initialState(columns, rows));
+  const [state, setState] = useState(() => initial ?? initialState(columns, rows));
   const stateRef = useRef(state);
   const statusRef = useRef<StoredSession['status']>('completed');
   stateRef.current = state;
@@ -46,15 +49,18 @@ export function App({simulate, scenario, store}: Props) {
   const runtime = useMemo(() => new RuntimeController(send, simulate, scenario), [simulate, scenario]);
 
   React.useEffect(() => {
-    store?.createSession(
-      stateRef.current.sessionId,
-      simulate ? 'Interactive simulated session' : 'Interactive session',
-      stateRef.current.startedAt,
-    );
+    if (sessionMode === 'new') {
+      store?.createSession(
+        stateRef.current.sessionId,
+        simulate ? 'Interactive simulated session' : 'Interactive session',
+        stateRef.current.startedAt,
+      );
+    }
     return () => {
+      runtime.shutdown();
       store?.finishSession(stateRef.current.sessionId, statusRef.current, Date.now());
     };
-  }, [simulate, store]);
+  }, [runtime, sessionMode, simulate, store]);
 
   React.useEffect(() => {
     send({type: 'TerminalResized', width: columns, height: rows, at: Date.now()});

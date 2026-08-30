@@ -24,9 +24,11 @@
 - `MemoryUpdated` canonical event added for user constraints and future agent findings.
 - SQLite now projects canonical events into queryable messages, tasks, and memories.
 - Interactive TUI sessions now persist canonical events and final session status when launched through the CLI.
+- `ateam resume` now launches a persisted session back into the TUI; `ateam resume --json` remains structured output.
 - Live cancel steering now emits cancellation immediately while simulated work is active.
 - Simulated cancellation now marks active tasks cancelled and restores agent availability.
 - Reducer now derives agent running task counts from canonical task state.
+- Reducer running state now reflects active/blocked execution instead of planned-but-idle tasks.
 - Unit tests for commands, reducer, input editor, runtime, simulator, process runner, headless mode, and TUI render/input.
 
 ## IN_PROGRESS
@@ -49,7 +51,7 @@
 - Expand process-control utilities with provider fixtures and abort-signal tests.
 - Expand simulation tests for rate limit, permission, crash, and cancellation.
 - Wire context packets into real provider execution.
-- Resume directly into interactive TUI sessions.
+- Improve resumed runtime reconstruction so memory/task graph internals are restored, not only visible state.
 
 ## DEFERRED
 
