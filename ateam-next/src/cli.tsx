@@ -17,16 +17,22 @@ program
   .name('ateam')
   .description('Unified multi-agent AI engineering terminal.')
   .version('0.1.0')
-  .action(() => {
-    render(<App simulate={false} scenario="STREAMING" />);
+  .action(async () => {
+    const store = new AteamStore();
+    const instance = render(<App simulate={false} scenario="STREAMING" store={store} />);
+    await instance.waitUntilExit();
+    store.close();
   });
 
 program.command('dev')
   .description('run development modes')
   .option('--simulate', 'run with simulated agents', true)
   .option('--scenario <scenario>', 'FAST|SLOW|STREAMING|TOOL_HEAVY|AUTH_FAILURE|RATE_LIMIT|CRASH|TIMEOUT|PERMISSION_REQUEST|MALFORMED_STREAM', 'STREAMING')
-  .action(options => {
-    render(<App simulate={Boolean(options.simulate)} scenario={normalizeScenario(options.scenario)} />);
+  .action(async options => {
+    const store = new AteamStore();
+    const instance = render(<App simulate={Boolean(options.simulate)} scenario={normalizeScenario(options.scenario)} store={store} />);
+    await instance.waitUntilExit();
+    store.close();
   });
 
 program.command('run')

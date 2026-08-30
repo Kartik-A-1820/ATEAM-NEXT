@@ -23,6 +23,7 @@
 - Context compiler and provenance-aware in-memory memory store added.
 - `MemoryUpdated` canonical event added for user constraints and future agent findings.
 - SQLite now projects canonical events into queryable messages, tasks, and memories.
+- Interactive TUI sessions now persist canonical events and final session status when launched through the CLI.
 - Live cancel steering now emits cancellation immediately while simulated work is active.
 - Simulated cancellation now marks active tasks cancelled and restores agent availability.
 - Reducer now derives agent running task counts from canonical task state.
@@ -48,7 +49,7 @@
 - Expand process-control utilities with provider fixtures and abort-signal tests.
 - Expand simulation tests for rate limit, permission, crash, and cancellation.
 - Wire context packets into real provider execution.
-- Persist TUI sessions, not only headless simulation sessions.
+- Resume directly into interactive TUI sessions.
 
 ## DEFERRED
 

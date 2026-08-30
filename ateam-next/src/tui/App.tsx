@@ -7,10 +7,12 @@ import {initialState, reduce, visibleEntries} from '../domain/state.js';
 import type {AteamEvent, RuntimeCommand} from '../domain/events.js';
 import {commandHelp, parseInput} from '../commands/registry.js';
 import {InputBox} from './InputBox.js';
+import type {AteamStore, StoredSession} from '../storage/store.js';
 
 interface Props {
   simulate: boolean;
   scenario: SimulationScenario;
+  store?: AteamStore;
 }
 
 const statusSymbol: Record<string, string> = {
@@ -22,18 +24,37 @@ const statusSymbol: Record<string, string> = {
   UNHEALTHY: '!',
 };
 
-export function App({simulate, scenario}: Props) {
+export function App({simulate, scenario, store}: Props) {
   const {exit} = useApp();
   const {columns, rows} = useWindowSize();
   const [state, setState] = useState(() => initialState(columns, rows));
   const stateRef = useRef(state);
+  const statusRef = useRef<StoredSession['status']>('completed');
   stateRef.current = state;
 
   const send = (event: AteamEvent) => {
+    if (event.type === 'RuntimeError') {
+      statusRef.current = 'failed';
+    }
+    if (event.type === 'StopRequested') {
+      statusRef.current = 'cancelled';
+    }
+    store?.appendEvent(stateRef.current.sessionId, event);
     setState(current => reduce(current, event));
   };
 
   const runtime = useMemo(() => new RuntimeController(send, simulate, scenario), [simulate, scenario]);
+
+  React.useEffect(() => {
+    store?.createSession(
+      stateRef.current.sessionId,
+      simulate ? 'Interactive simulated session' : 'Interactive session',
+      stateRef.current.startedAt,
+    );
+    return () => {
+      store?.finishSession(stateRef.current.sessionId, statusRef.current, Date.now());
+    };
+  }, [simulate, store]);
 
   React.useEffect(() => {
     send({type: 'TerminalResized', width: columns, height: rows, at: Date.now()});

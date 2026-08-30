@@ -61,7 +61,7 @@ On Windows, command resolution prefers spawnable `.exe`, `.cmd`, and `.bat` entr
 
 ## Persistence
 
-SQLite is authoritative for sessions and event replay. Current tables include `sessions`, `events`, `messages`, `tasks`, and `memories`. The current implementation persists canonical events for headless simulated runs and can list/resume sessions from the event log.
+SQLite is authoritative for sessions and event replay. Current tables include `sessions`, `events`, `messages`, `tasks`, and `memories`. Headless runs and interactive TUI sessions both persist canonical events and can be listed/resumed from the event log.
 
 `appendEvent` also maintains queryable projections for:
 
