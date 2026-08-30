@@ -8,6 +8,7 @@ export interface ContextPacket {
   userConstraints: string[];
   relevantMemory: MemoryRecord[];
   upstreamResults: string[];
+  codeContext?: string[];
   acceptanceCriteria: string[];
   permissionPolicy: PermissionProfile;
   expectedOutput: string;
@@ -19,8 +20,10 @@ export function compileContextPacket(input: {
   memories: MemoryRecord[];
   permissionPolicy: PermissionProfile;
   upstreamResults?: string[];
+  codeContext?: {relevantSymbols: string[]; relevantFiles: string[]};
 }): ContextPacket {
-  return {
+  const codeContext = formatCodeContext(input.codeContext);
+  const packet: ContextPacket = {
     task: {
       id: input.task.id,
       objective: input.task.objective,
@@ -35,6 +38,16 @@ export function compileContextPacket(input: {
     permissionPolicy: input.permissionPolicy,
     expectedOutput: expectedOutput(input.task.type),
   };
+  if (codeContext.length > 0) packet.codeContext = codeContext;
+  return packet;
+}
+
+function formatCodeContext(context: {relevantSymbols: string[]; relevantFiles: string[]} | undefined): string[] {
+  if (!context || (context.relevantSymbols.length === 0 && context.relevantFiles.length === 0)) return [];
+  return [
+    context.relevantSymbols.length > 0 ? `Relevant symbols: ${context.relevantSymbols.join(' | ')}` : undefined,
+    context.relevantFiles.length > 0 ? `Relevant files: ${context.relevantFiles.join(' | ')}` : undefined,
+  ].filter((line): line is string => Boolean(line));
 }
 
 function expectedOutput(type: PlannedTask['type']): string {

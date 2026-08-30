@@ -19,6 +19,8 @@ export function initialState(width = 100, height = 30): AppState {
     activeTab: 'Plan',
     verbosity: 'NORMAL',
     permissionMode: 'STANDARD',
+    pipelinePhase: 'IDLE',
+    planSummary: undefined,
     agents: structuredClone(agentDefaults),
     conversation: [
       entry('System', 'Simulated Ateam session ready. Type a message or /help.', 'NORMAL'),
@@ -27,15 +29,20 @@ export function initialState(width = 100, height = 30): AppState {
     running: false,
     quitting: false,
     log: [],
+    openStreams: {},
   };
 }
 
-function entry(speaker: ConversationEntry['speaker'], text: string, level: Verbosity): ConversationEntry {
-  return {id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, speaker, text, time: Date.now(), level};
+function entry(speaker: ConversationEntry['speaker'], text: string, level: Verbosity, taskId?: string): ConversationEntry {
+  return {id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, speaker, text, time: Date.now(), level, ...(taskId === undefined ? {} : {taskId})};
+}
+
+function streamKey(agentId: AgentId, taskId?: string): string {
+  return `${agentId}:${taskId ?? ''}`;
 }
 
 export function reduce(state: AppState, event: AteamEvent): AppState {
-  const next: AppState = {...state, agents: {...state.agents}, tasks: {...state.tasks}, conversation: [...state.conversation], log: [...state.log]};
+  const next: AppState = {...state, agents: {...state.agents}, tasks: {...state.tasks}, conversation: [...state.conversation], log: [...state.log], openStreams: {...(state.openStreams ?? {})}};
   next.log.push(JSON.stringify(event));
 
   switch (event.type) {
@@ -56,12 +63,18 @@ export function reduce(state: AppState, event: AteamEvent): AppState {
       return next;
     }
     case 'AgentStreamDelta': {
-      const agent = event.agentId;
-      const last = next.conversation[next.conversation.length - 1];
-      if (last?.speaker === agent) {
-        next.conversation[next.conversation.length - 1] = {...last, text: `${last.text}${event.delta}`};
+      const openStreams = next.openStreams ?? {};
+      next.openStreams = openStreams;
+      const key = streamKey(event.agentId, event.taskId);
+      const openId = openStreams[key];
+      const index = openId === undefined ? -1 : next.conversation.findIndex(item => item.id === openId);
+      if (index >= 0) {
+        const current = next.conversation[index];
+        next.conversation[index] = {...current, text: `${current.text}${event.delta}`};
       } else {
-        next.conversation.push(entry(agent, event.delta, 'NORMAL'));
+        const created = entry(event.agentId, event.delta, 'NORMAL', event.taskId);
+        next.conversation.push(created);
+        openStreams[key] = created.id;
       }
       return next;
     }
@@ -78,17 +91,47 @@ export function reduce(state: AppState, event: AteamEvent): AppState {
       next.conversation.push(entry('System', `Permission requested by ${event.agentId}: ${event.capability} (${event.reason})`, 'NORMAL'));
       return next;
     case 'TaskCreated':
-      next.tasks[event.taskId] = {id: event.taskId, objective: event.objective, assignedAgent: event.assignedAgent, dependencies: event.dependencies ?? [], status: 'READY', priority: 50};
+      next.tasks[event.taskId] = {id: event.taskId, objective: event.objective, assignedAgent: event.assignedAgent, dependencies: event.dependencies ?? [], status: 'READY', priority: 50, kind: event.kind};
       recomputeAgentWorkload(next);
       next.running = hasActiveTasks(next);
       return next;
-    case 'TaskAssigned':
-      if (next.tasks[event.taskId]) {
-        next.tasks[event.taskId] = {...next.tasks[event.taskId], assignedAgent: event.agentId};
+    case 'TaskAssigned': {
+      const task = next.tasks[event.taskId];
+      if (task) {
+        next.tasks[event.taskId] = {...task, assignedAgent: event.agentId, attempts: appendAttempt(task.attempts, event.agentId, event.reason, event.at)};
       }
+      setCurrentTask(next, event.agentId, event.taskId, task?.objective);
       recomputeAgentWorkload(next);
       next.conversation.push(entry('Ateam', `${event.taskId} assigned to ${event.agentId}: ${event.reason}`, 'VERBOSE'));
       return next;
+    }
+    case 'TaskReassigned': {
+      const task = next.tasks[event.taskId];
+      if (task) {
+        next.tasks[event.taskId] = {...task, assignedAgent: event.toAgent, attempts: appendAttempt(task.attempts, event.toAgent, event.reason, event.at)};
+      }
+      if (event.fromAgent) clearCurrentTask(next, event.fromAgent, event.taskId);
+      setCurrentTask(next, event.toAgent, event.taskId, task?.objective);
+      recomputeAgentWorkload(next);
+      next.conversation.push(entry(
+        'Ateam',
+        `${event.taskId} reassigned${event.fromAgent ? ` from ${event.fromAgent}` : ''} to ${event.toAgent} (attempt ${event.attempt}): ${event.reason}`,
+        'NORMAL',
+      ));
+      return next;
+    }
+    case 'AgentCooldownChanged': {
+      const current = next.agents[event.agentId];
+      next.agents[event.agentId] = {...current, cooldownUntil: event.cooldownUntil, cooldownReason: event.cooldownUntil !== undefined ? event.reason : undefined};
+      next.conversation.push(entry(
+        'System',
+        event.cooldownUntil !== undefined
+          ? `${current.displayName} cooling down until ${new Date(event.cooldownUntil).toLocaleTimeString()}: ${event.reason}`
+          : `${current.displayName} cooldown cleared: ${event.reason}`,
+        event.cooldownUntil !== undefined ? 'NORMAL' : 'VERBOSE',
+      ));
+      return next;
+    }
     case 'TaskInvalidated':
       if (next.tasks[event.taskId]) {
         next.tasks[event.taskId] = {...next.tasks[event.taskId], status: 'INVALIDATED'};
@@ -96,14 +139,26 @@ export function reduce(state: AppState, event: AteamEvent): AppState {
       recomputeAgentWorkload(next);
       next.running = hasActiveTasks(next);
       return next;
-    case 'TaskStatusChanged':
-      if (next.tasks[event.taskId]) {
-        next.tasks[event.taskId] = {...next.tasks[event.taskId], status: event.status};
+    case 'TaskStatusChanged': {
+      const task = next.tasks[event.taskId];
+      if (task) {
+        next.tasks[event.taskId] = {...task, status: event.status};
+      }
+      if (event.status !== 'RUNNING') {
+        const openStreams = next.openStreams ?? {};
+        next.openStreams = openStreams;
+        const suffix = `:${event.taskId}`;
+        for (const key of Object.keys(openStreams)) {
+          if (key.endsWith(suffix)) delete openStreams[key];
+        }
+        if (task?.assignedAgent) clearCurrentTask(next, task.assignedAgent, event.taskId);
       }
       recomputeAgentWorkload(next);
       next.running = hasActiveTasks(next);
       return next;
+    }
     case 'PlanUpdated':
+      next.planSummary = event.summary;
       next.conversation.push(entry('Ateam', event.summary, 'NORMAL'));
       return next;
     case 'ContextUpdated':
@@ -157,6 +212,16 @@ export function reduce(state: AppState, event: AteamEvent): AppState {
     case 'ViewChanged':
       next.activeTab = event.tab;
       return next;
+    case 'PipelinePhaseChanged':
+      next.pipelinePhase = event.phase;
+      next.conversation.push(entry('Ateam', `Pipeline phase: ${event.phase}.`, event.phase === 'IDLE' ? 'VERBOSE' : 'NORMAL'));
+      return next;
+    case 'ConversationCleared':
+      next.conversation = [];
+      return next;
+    case 'AteamReplied':
+      next.conversation.push(entry('Ateam', event.text, 'QUIET'));
+      return next;
     default:
       return next;
   }
@@ -170,6 +235,21 @@ export function visibleEntries(state: AppState): ConversationEntry[] {
 
 function hasActiveTasks(state: AppState): boolean {
   return Object.values(state.tasks).some(task => task.status === 'RUNNING' || task.status === 'BLOCKED');
+}
+
+function appendAttempt(attempts: AppState['tasks'][string]['attempts'], agentId: AgentId, reason: string, at: number): NonNullable<AppState['tasks'][string]['attempts']> {
+  return [...(attempts ?? []), {agentId, reason, at}];
+}
+
+function setCurrentTask(state: AppState, agentId: AgentId, taskId: string, objective: string | undefined): void {
+  const current = state.agents[agentId];
+  state.agents[agentId] = {...current, currentTaskId: taskId, currentTaskObjective: objective};
+}
+
+function clearCurrentTask(state: AppState, agentId: AgentId, taskId: string): void {
+  const current = state.agents[agentId];
+  if (current.currentTaskId !== taskId) return;
+  state.agents[agentId] = {...current, currentTaskId: undefined, currentTaskObjective: undefined};
 }
 
 function recomputeAgentWorkload(state: AppState): void {

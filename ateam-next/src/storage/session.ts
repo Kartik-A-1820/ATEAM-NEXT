@@ -1,5 +1,6 @@
+import {reduceHealthEvents, type AgentHealth} from '../domain/agentHealth.js';
 import {initialState, reduce} from '../domain/state.js';
-import type {AppState} from '../domain/types.js';
+import type {AgentId, AppState} from '../domain/types.js';
 import {AteamStore, type StoredSession} from './store.js';
 
 export function replaySession(store: AteamStore, sessionId: string): AppState | undefined {
@@ -11,6 +12,10 @@ export function replaySession(store: AteamStore, sessionId: string): AppState | 
     state = reduce(state, item.event);
   }
   return state;
+}
+
+export function replaySessionHealth(store: AteamStore, sessionId: string): Partial<Record<AgentId, AgentHealth>> {
+  return reduceHealthEvents(store.eventsForSession(sessionId).map(item => item.event));
 }
 
 export function formatSessionList(sessions: StoredSession[]): string {

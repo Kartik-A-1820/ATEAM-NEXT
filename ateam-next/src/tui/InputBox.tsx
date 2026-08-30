@@ -1,18 +1,26 @@
 import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
-import {applyEdit, createInputEditor, insertText, submit} from '../input/editor.js';
+import {applyEdit, createInputEditor, insertImagePlaceholder, insertText, submit} from '../input/editor.js';
+import {captureClipboardImage} from '../input/clipboardImage.js';
 
 interface Props {
   onSubmit: (value: string) => void;
   disabled?: boolean;
+  placeholder?: string;
+  running?: boolean;
 }
 
-export function InputBox({onSubmit, disabled = false}: Props) {
+const PASTE_IMAGE_COMMAND = '/paste-image';
+
+export function InputBox({onSubmit, disabled = false, placeholder, running = false}: Props) {
   const [editor, setEditor] = useState(createInputEditor);
 
   useInput((input, key) => {
     if (disabled) return;
     if (key.ctrl && input === 'c') {
+      return;
+    }
+    if (key.tab) {
       return;
     }
     const submitIndex = firstSubmitIndex(input);
@@ -21,8 +29,9 @@ export function InputBox({onSubmit, disabled = false}: Props) {
       setEditor(current => {
         const withChunk = beforeSubmit.length > 0 ? insertText(current, beforeSubmit) : current;
         const result = submit(withChunk);
-        if (result.submitted) {
-          onSubmit(result.submitted);
+        const submitted = result.submitted;
+        if (submitted) {
+          queueMicrotask(() => onSubmit(submitted));
         }
         return result.state;
       });
@@ -33,10 +42,20 @@ export function InputBox({onSubmit, disabled = false}: Props) {
       return;
     }
     if (key.return) {
+      if (editor.value.trim() === PASTE_IMAGE_COMMAND) {
+        setEditor(current => ({...current, value: '', cursor: 0}));
+        void captureClipboardImage().then(result => {
+          setEditor(current => result.ok && result.path
+            ? insertImagePlaceholder(current, result.path!)
+            : insertText(current, `[image paste failed: ${result.reason ?? 'unknown error'}] `));
+        });
+        return;
+      }
       setEditor(current => {
         const result = submit(current);
-        if (result.submitted) {
-          onSubmit(result.submitted);
+        const submitted = result.submitted;
+        if (submitted) {
+          queueMicrotask(() => onSubmit(submitted));
         }
         return result.state;
       });
@@ -50,22 +69,27 @@ export function InputBox({onSubmit, disabled = false}: Props) {
     else if (key.end) setEditor(current => applyEdit(current, 'end'));
     else if (key.backspace) setEditor(current => applyEdit(current, 'backspace'));
     else if (key.delete) setEditor(current => applyEdit(current, 'delete'));
-    else if (input) setEditor(current => insertText(current, input));
+    else if (input && !key.ctrl && !key.meta) setEditor(current => insertText(current, input));
   });
 
   const chars = Array.from(editor.value);
   const before = chars.slice(0, editor.cursor).join('');
   const cursorChar = chars[editor.cursor] ?? ' ';
   const after = chars.slice(editor.cursor + 1).join('');
+  const idle = editor.value.length === 0;
 
   return (
-    <Box borderStyle="single" paddingX={1} minHeight={3} flexDirection="column">
+    <Box borderStyle="single" paddingX={1} minHeight={3} flexDirection="column" flexShrink={0}>
       <Text>
         <Text color="green">{'>'} </Text>
+        {idle && placeholder ? <Text dimColor>{placeholder}</Text> : null}
         <Text>{before}</Text>
         <Text inverse>{cursorChar}</Text>
         <Text>{after}</Text>
       </Text>
+      {idle ? (
+        <Text dimColor>{running ? 'running…  ' : ''}shift+enter newline · /commands · /paste-image · tab cycle views</Text>
+      ) : null}
     </Box>
   );
 }

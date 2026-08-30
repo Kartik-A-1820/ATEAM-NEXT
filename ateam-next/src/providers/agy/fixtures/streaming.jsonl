@@ -1,0 +1,7 @@
+{"type":"message_start","message":{"id":"msg_01","model":"agy-2","role":"assistant"}}
+{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello "}}
+{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"world"}}
+{"type":"tool_use_start","id":"tu_01","name":"shell","input":{}}
+{"type":"tool_use_end","id":"tu_01","name":"shell","result":"exit 0"}
+{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":22}}
+{"type":"message_stop"}

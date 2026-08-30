@@ -1,0 +1,6 @@
+{
+  "type": "error",
+  "error": "Authentication failed: please login",
+  "code": "unauthenticated",
+  "unknownCode": 1
+}

@@ -1,0 +1,13 @@
+{
+  "text": "Auth handler should reject expired tokens.",
+  "stopReason": "end_turn",
+  "sessionId": "sess_grok_1",
+  "requestId": "req_123",
+  "thought": "Reviewing the request.",
+  "usage": {
+    "input_tokens": 12,
+    "output_tokens": 9,
+    "total_tokens": 21
+  },
+  "futureField": {"nested": true}
+}

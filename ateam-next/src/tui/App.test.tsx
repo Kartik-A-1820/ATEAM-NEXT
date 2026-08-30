@@ -38,6 +38,41 @@ describe('App TUI', () => {
     store.close();
   });
 
+  it('renders context and diff empty states from slash navigation', async () => {
+    const {lastFrame, stdin, unmount} = render(<App simulate={true} scenario="FAST" />);
+    stdin.write('/diff\r');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    // DiffView now shells out to real `git diff` and starts in a loading state;
+    // 20ms is well under real subprocess latency, so this is deterministic.
+    expect(lastFrame()).toContain('Loading diff...');
+    stdin.write('/context\r');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(lastFrame()).toContain('latest user instruction always supersedes the active plan.');
+    unmount();
+  });
+
+  it('renders all four agent names in the header', () => {
+    const {lastFrame, unmount} = render(<App simulate={true} scenario="FAST" />);
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('Codex');
+    expect(frame).toContain('Claude');
+    expect(frame).toContain('AGY');
+    expect(frame).toContain('Grok');
+    expect(frame).toContain('STANDARD');
+    unmount();
+  });
+
+  it('switches to Agents and Tasks tabs after slash commands', async () => {
+    const {lastFrame, stdin, unmount} = render(<App simulate={true} scenario="FAST" />);
+    stdin.write('/agents\r');
+    await new Promise(resolve => setTimeout(resolve, 30));
+    expect(lastFrame()).toContain('[Agents]');
+    stdin.write('/tasks\r');
+    await new Promise(resolve => setTimeout(resolve, 30));
+    expect(lastFrame()).toContain('[Tasks]');
+    unmount();
+  });
+
   it('renders replayed state for interactive resume', () => {
     const initial = {
       ...AppInitialState(),
@@ -58,6 +93,7 @@ function AppInitialState() {
     activeTab: 'Plan' as const,
     verbosity: 'NORMAL' as const,
     permissionMode: 'STANDARD' as const,
+    pipelinePhase: 'IDLE' as const,
     agents: {
       codex: {id: 'codex' as const, displayName: 'Codex', color: 'green' as const, availability: 'READY' as const, installed: true, authenticated: 'UNKNOWN' as const, runningTaskCount: 0},
       claude: {id: 'claude' as const, displayName: 'Claude', color: 'yellow' as const, availability: 'READY' as const, installed: true, authenticated: 'UNKNOWN' as const, runningTaskCount: 0},

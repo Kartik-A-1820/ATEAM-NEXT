@@ -1,7 +1,17 @@
-import {describe, expect, it} from 'vitest';
-import {applyEdit, createInputEditor, insertText, submit} from './editor.js';
+import {rmSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {afterEach, describe, expect, it} from 'vitest';
+import {applyEdit, createInputEditor, insertImagePlaceholder, insertText, submit} from './editor.js';
 
 describe('input editor', () => {
+  const tempFiles: string[] = [];
+  afterEach(() => {
+    for (const file of tempFiles.splice(0)) {
+      rmSync(file, {force: true});
+    }
+  });
+
   it('supports insertion, cursor movement, deletion, and unicode text', () => {
     let state = createInputEditor();
     state = insertText(state, 'hello 🌍');
@@ -22,11 +32,62 @@ describe('input editor', () => {
     expect(recalled.value).toBe('line one\nline two');
   });
 
-  it('handles large multiline paste as one insertion', () => {
+  it('compacts a large paste to a placeholder and expands it back on submit', () => {
     const paste = Array.from({length: 250}, (_, index) => `line ${index} with unicode ${index % 2 === 0 ? '✅' : 'नमस्ते'}`).join('\n');
     const state = insertText(createInputEditor(), paste);
-    expect(state.value).toBe(paste);
-    expect(state.cursor).toBe(Array.from(paste).length);
+    expect(state.value).not.toBe(paste);
+    expect(state.value).toMatch(/^\[[\d,]+ chars pasted #1]$/);
+    expect(state.value.length).toBeLessThan(50);
+
+    const result = submit(state);
+    expect(result.submitted).toBe(paste);
+  });
+
+  it('keeps a short paste inline, uncompacted', () => {
+    const state = insertText(createInputEditor(), 'a short paste');
+    expect(state.value).toBe('a short paste');
+  });
+
+  it('deletes a pasted placeholder as one atomic unit with backspace', () => {
+    const big = 'x'.repeat(500);
+    let state = insertText(createInputEditor(), 'before ');
+    state = insertText(state, big);
+    state = insertText(state, ' after');
+    const withPlaceholder = state.value;
+    expect(withPlaceholder).toContain('before [');
+    expect(withPlaceholder).toContain('] after');
+
+    // Move cursor to just after the placeholder, then backspace once.
+    const placeholderEnd = withPlaceholder.indexOf('] after') + 1;
+    state = {...state, cursor: placeholderEnd};
+    state = applyEdit(state, 'backspace');
+    expect(state.value).toBe('before  after');
+
+    const result = submit(state);
+    expect(result.submitted).toBe('before  after');
+  });
+
+  it('inserts and expands an image reference placeholder', () => {
+    const state = insertImagePlaceholder(createInputEditor(), '/tmp/screenshot.png');
+    expect(state.value).toBe('[image attached #1: screenshot.png]');
+    const result = submit(state);
+    expect(result.submitted).toBe('(attached image: /tmp/screenshot.png)');
+  });
+
+  it('auto-detects a pasted path to an existing image file', () => {
+    const path = join(tmpdir(), `ateam-editor-test-${Date.now()}.png`);
+    writeFileSync(path, Buffer.from([0]));
+    tempFiles.push(path);
+
+    const state = insertText(createInputEditor(), path);
+    expect(state.value).toBe(`[image attached #1: ${path.split(/[\\/]/).pop()}]`);
+    const result = submit(state);
+    expect(result.submitted).toBe(`(attached image: ${path})`);
+  });
+
+  it('does not treat a nonexistent image-like path as an attachment', () => {
+    const state = insertText(createInputEditor(), '/definitely/not/a/real/path.png');
+    expect(state.value).toBe('/definitely/not/a/real/path.png');
   });
 
   it('does not wipe fresh draft text when navigating history forward', () => {

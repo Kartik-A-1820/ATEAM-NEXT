@@ -1,12 +1,18 @@
+import {existsSync} from 'node:fs';
+import {basename} from 'node:path';
+
 export interface InputEditorState {
   value: string;
   cursor: number;
   history: string[];
   historyIndex?: number;
+  /** Placeholder text (e.g. "[4000 chars pasted #1]") -> the real text it expands to at submit time. */
+  pastes: Record<string, string>;
+  pasteCounter: number;
 }
 
 export function createInputEditor(): InputEditorState {
-  return {value: '', cursor: 0, history: []};
+  return {value: '', cursor: 0, history: [], pastes: {}, pasteCounter: 0};
 }
 
 export type EditKey =
@@ -22,11 +28,51 @@ export type EditKey =
   | 'historyNext'
   | 'newline';
 
+/** Long pastes collapse to a short placeholder instead of flooding the input line. */
+const PASTE_COMPACT_THRESHOLD = 400;
+
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']);
+
 export function insertText(state: InputEditorState, text: string): InputEditorState {
-  const chars = charsOf(state.value);
+  const imagePath = detectImagePath(text);
+  if (imagePath) {
+    return insertPlaceholder(state, `[image attached #${state.pasteCounter + 1}: ${basename(imagePath)}]`, `(attached image: ${imagePath})`);
+  }
   const inserted = charsOf(text);
+  if (inserted.length > PASTE_COMPACT_THRESHOLD) {
+    return insertPlaceholder(state, `[${inserted.length.toLocaleString()} chars pasted #${state.pasteCounter + 1}]`, text);
+  }
+  const chars = charsOf(state.value);
   chars.splice(state.cursor, 0, ...inserted);
   return {...state, value: chars.join(''), cursor: state.cursor + inserted.length, historyIndex: undefined};
+}
+
+/** Inserts an image reference placeholder at the cursor, e.g. from a clipboard-image capture. */
+export function insertImagePlaceholder(state: InputEditorState, imagePath: string): InputEditorState {
+  return insertPlaceholder(state, `[image attached #${state.pasteCounter + 1}: ${basename(imagePath)}]`, `(attached image: ${imagePath})`);
+}
+
+function insertPlaceholder(state: InputEditorState, placeholder: string, expansion: string): InputEditorState {
+  const chars = charsOf(state.value);
+  const placeholderChars = charsOf(placeholder);
+  chars.splice(state.cursor, 0, ...placeholderChars);
+  return {
+    ...state,
+    value: chars.join(''),
+    cursor: state.cursor + placeholderChars.length,
+    historyIndex: undefined,
+    pastes: {...state.pastes, [placeholder]: expansion},
+    pasteCounter: state.pasteCounter + 1,
+  };
+}
+
+function detectImagePath(text: string): string | undefined {
+  const trimmed = text.trim().replace(/^['"]|['"]$/g, '');
+  if (trimmed.length === 0 || trimmed.includes('\n') || trimmed.length > 1000) return undefined;
+  const dot = trimmed.lastIndexOf('.');
+  if (dot === -1 || !IMAGE_EXTENSIONS.has(trimmed.slice(dot).toLowerCase())) return undefined;
+  if (!existsSync(trimmed)) return undefined;
+  return trimmed;
 }
 
 export function applyEdit(state: InputEditorState, key: EditKey): InputEditorState {
@@ -39,12 +85,18 @@ export function applyEdit(state: InputEditorState, key: EditKey): InputEditorSta
       return {...state, cursor: lineStart(state.value, state.cursor)};
     case 'end':
       return {...state, cursor: lineEnd(state.value, state.cursor)};
-    case 'backspace':
+    case 'backspace': {
       if (state.cursor === 0) return state;
+      const placeholder = placeholderEndingAt(state, state.cursor);
+      if (placeholder) return removeRange(state, state.cursor - charsOf(placeholder).length, state.cursor, placeholder);
       return removeAt(state, state.cursor - 1);
-    case 'delete':
+    }
+    case 'delete': {
       if (state.cursor >= charsOf(state.value).length) return state;
+      const placeholder = placeholderStartingAt(state, state.cursor);
+      if (placeholder) return removeRange(state, state.cursor, state.cursor + charsOf(placeholder).length, placeholder);
       return removeAt(state, state.cursor);
+    }
     case 'wordLeft':
       return {...state, cursor: previousWord(state.value, state.cursor)};
     case 'wordRight':
@@ -60,15 +112,43 @@ export function applyEdit(state: InputEditorState, key: EditKey): InputEditorSta
   }
 }
 
+/** A pasted block (long text or an image reference) deletes as one atomic unit, not char by char. */
+function placeholderEndingAt(state: InputEditorState, endExclusive: number): string | undefined {
+  const valueChars = charsOf(state.value);
+  for (const key of Object.keys(state.pastes)) {
+    const keyChars = charsOf(key);
+    const start = endExclusive - keyChars.length;
+    if (start >= 0 && valueChars.slice(start, endExclusive).join('') === key) return key;
+  }
+  return undefined;
+}
+
+function placeholderStartingAt(state: InputEditorState, start: number): string | undefined {
+  const valueChars = charsOf(state.value);
+  for (const key of Object.keys(state.pastes)) {
+    const keyChars = charsOf(key);
+    if (valueChars.slice(start, start + keyChars.length).join('') === key) return key;
+  }
+  return undefined;
+}
+
 export function submit(state: InputEditorState): {state: InputEditorState; submitted?: string} {
-  const text = state.value;
-  if (text.trim().length === 0) {
+  const expanded = expandPastes(state.value, state.pastes);
+  if (expanded.trim().length === 0) {
     return {state};
   }
   return {
-    submitted: text,
-    state: {value: '', cursor: 0, history: [...state.history, text].slice(-100), historyIndex: undefined},
+    submitted: expanded,
+    state: {value: '', cursor: 0, history: [...state.history, expanded].slice(-100), historyIndex: undefined, pastes: {}, pasteCounter: 0},
   };
+}
+
+function expandPastes(value: string, pastes: Record<string, string>): string {
+  let result = value;
+  for (const [placeholder, expansion] of Object.entries(pastes)) {
+    result = result.split(placeholder).join(expansion);
+  }
+  return result;
 }
 
 function lineStart(value: string, cursor: number): number {
@@ -121,4 +201,14 @@ function removeAt(state: InputEditorState, index: number): InputEditorState {
   const chars = charsOf(state.value);
   chars.splice(index, 1);
   return {...state, value: chars.join(''), cursor: Math.min(index, chars.length)};
+}
+
+function removeRange(state: InputEditorState, from: number, to: number, removedPlaceholder?: string): InputEditorState {
+  const chars = charsOf(state.value);
+  chars.splice(from, to - from);
+  const pastes = state.pastes;
+  const nextPastes = removedPlaceholder && removedPlaceholder in pastes
+    ? Object.fromEntries(Object.entries(pastes).filter(([key]) => key !== removedPlaceholder))
+    : pastes;
+  return {...state, value: chars.join(''), cursor: from, pastes: nextPastes};
 }

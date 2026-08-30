@@ -1,9 +1,10 @@
 import {readFileSync} from 'node:fs';
-import {join} from 'node:path';
+import {dirname, join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
-import {parseCodexJsonl} from './parser.js';
+import {classifyCodexFailureText, parseCodexJsonl} from './parser.js';
 
-const fixtures = join(process.cwd(), 'src', 'providers', 'codex', 'fixtures');
+const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
 describe('parseCodexJsonl', () => {
   it('normalizes streaming and tool events', () => {
@@ -16,6 +17,11 @@ describe('parseCodexJsonl', () => {
   it('normalizes auth and rate-limit failures', () => {
     expect(parseCodexJsonl(readFileSync(join(fixtures, 'auth_failure.jsonl'), 'utf8'), {at: 1})[0]).toMatchObject({type: 'AgentAvailabilityChanged', availability: 'AUTH_ERROR'});
     expect(parseCodexJsonl(readFileSync(join(fixtures, 'rate_limit.jsonl'), 'utf8'), {at: 1})[0]).toMatchObject({type: 'RateLimited', agentId: 'codex'});
+  });
+
+  it('treats ChatGPT usage-limit stderr as RateLimited with a reset hint', () => {
+    const event = classifyCodexFailureText("You've hit your usage limit. Upgrade to Pro or try again at 5:52 PM.");
+    expect(event).toMatchObject({type: 'RateLimited', agentId: 'codex', resetHint: '5:52 PM'});
   });
 
   it('survives malformed and unknown events', () => {

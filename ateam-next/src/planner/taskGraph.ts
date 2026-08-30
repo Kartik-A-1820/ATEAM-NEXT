@@ -26,10 +26,12 @@ export function createInitialTaskGraph(objective: string, constraints: string[] 
     constraints,
     acceptanceCriteria: ['changes compile', 'tests pass', 'user constraints are preserved'],
     tasks: [
-      task('T1', 'Analyze objective and constraints', 'analysis', [], 100, ['read_project']),
-      task('T2', 'Implement minimal safe change', 'implementation', ['T1'], 80, ['read_project', 'write_project', 'shell']),
-      task('T3', 'Independently review implementation', 'review', ['T2'], 70, ['read_project']),
-      task('T4', 'Run verification and summarize result', 'verification', ['T2'], 90, ['read_project', 'shell']),
+      task('T1', `Plan independent workstreams for: ${objective}`, 'analysis', [], 100, ['read_project']),
+      task('T2', `Implement core change for: ${objective}`, 'implementation', ['T1'], 80, ['read_project', 'write_project', 'shell']),
+      task('T3', `Implement tests and edge coverage for: ${objective}`, 'implementation', ['T1'], 75, ['read_project', 'write_project', 'shell']),
+      task('T4', `Implement remaining independent slice for: ${objective}`, 'implementation', ['T1'], 70, ['read_project', 'write_project', 'shell']),
+      task('T5', `Independently review implementation for: ${objective}`, 'review', ['T2', 'T3', 'T4'], 60, ['read_project']),
+      task('T6', `Run verification and summarize result for: ${objective}`, 'verification', ['T2', 'T3', 'T4'], 90, ['read_project', 'shell']),
     ],
   };
 }
@@ -47,6 +49,16 @@ export function applyConstraint(graph: TaskGraph, constraint: string): TaskGraph
     constraints: [...graph.constraints, constraint],
     tasks: graph.tasks.map(task => shouldInvalidateForConstraint(task) ? {...task, status: 'INVALIDATED'} : task),
   };
+}
+
+export function implementationTaskIds(graph: TaskGraph): string[] {
+  return graph.tasks.filter(task => task.type === 'implementation').map(task => task.id);
+}
+
+export function pipelinePhaseForTask(task: PlannedTask): 'PLAN' | 'IMPLEMENT' | 'VALIDATE' {
+  if (task.type === 'review' || task.type === 'verification') return 'VALIDATE';
+  if (task.type === 'implementation') return 'IMPLEMENT';
+  return 'PLAN';
 }
 
 function shouldInvalidateForConstraint(task: PlannedTask): boolean {

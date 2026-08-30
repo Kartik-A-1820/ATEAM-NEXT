@@ -1,0 +1,5 @@
+{
+  "type": "error",
+  "message": "rate limit exceeded",
+  "retryAfter": "60s"
+}

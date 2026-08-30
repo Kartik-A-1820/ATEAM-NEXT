@@ -41,8 +41,8 @@ function normalizeCodexEvent(raw: unknown, options: Required<Pick<ParseCodexOpti
   if (type.includes('error')) {
     const message = String(raw.message ?? raw.error ?? 'Codex error');
     const lower = message.toLowerCase();
-    if (lower.includes('rate limit') || lower.includes('quota')) {
-      return {type: 'RateLimited', agentId: 'codex', at: options.at};
+    if (looksLikeUsageLimit(message)) {
+      return {type: 'RateLimited', agentId: 'codex', resetHint: extractResetHint(message), at: options.at};
     }
     if (lower.includes('auth') || lower.includes('login') || lower.includes('signed')) {
       return {type: 'AgentAvailabilityChanged', agentId: 'codex', availability: 'AUTH_ERROR', reason: message, at: options.at};
@@ -60,4 +60,30 @@ function normalizeCodexEvent(raw: unknown, options: Required<Pick<ParseCodexOpti
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function classifyCodexFailureText(message: string, at = Date.now()): AteamEvent {
+  if (looksLikeUsageLimit(message)) {
+    return {type: 'RateLimited', agentId: 'codex', resetHint: extractResetHint(message), at};
+  }
+  const lower = message.toLowerCase();
+  if (lower.includes('auth') || lower.includes('login') || lower.includes('signed')) {
+    return {type: 'AgentAvailabilityChanged', agentId: 'codex', availability: 'AUTH_ERROR', reason: message, at};
+  }
+  return {type: 'RuntimeError', message, at};
+}
+
+function looksLikeUsageLimit(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes('usage limit')
+    || lower.includes('rate limit')
+    || lower.includes('rate-limit')
+    || lower.includes('too many requests')
+    || /\bquota\b/.test(lower);
+}
+
+function extractResetHint(message: string): string | undefined {
+  const clock = /(?:try again at|reset(?:s)? at)\s*(\d{1,2}:\d{2}\s*(?:am|pm))/i.exec(message)
+    ?? /(\d{1,2}:\d{2}\s*(?:am|pm))/i.exec(message);
+  return clock?.[1] ?? clock?.[0];
 }

@@ -1,0 +1,19 @@
+{
+  "grokVersion": "1.0.13",
+  "channel": "stable",
+  "cwd": "/workspace",
+  "projectRoot": "/workspace",
+  "loginPolicy": {
+    "disableApiKeyAuth": null,
+    "forceLoginTeamUuid": null,
+    "apiKeyAuthDisabled": false
+  },
+  "configWarnings": [
+    {
+      "target": "configKey",
+      "path": "privacy",
+      "kind": "unknown-field",
+      "reason": "unrecognized config key"
+    }
+  ]
+}

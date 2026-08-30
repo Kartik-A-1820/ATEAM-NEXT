@@ -1,5 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
-import {Simulator} from './simulator.js';
+import {classifyMessage, Simulator} from './simulator.js';
 import type {AteamEvent} from '../domain/events.js';
 
 describe('Simulator', () => {
@@ -42,5 +42,60 @@ describe('Simulator', () => {
 
     expect(events.some(event => event.type === 'TaskStatusChanged' && event.status === 'CANCELLED')).toBe(true);
     vi.useRealTimers();
+  });
+
+  it('fans out tasks to all four agents and restores READY on cancel', async () => {
+    vi.useFakeTimers();
+    const events: AteamEvent[] = [];
+    const simulator = new Simulator(event => events.push(event));
+    simulator.run('Parallel workstream', 'STREAMING');
+    await vi.runAllTimersAsync();
+    const created = events.filter(event => event.type === 'TaskCreated').map(event => event.assignedAgent);
+    expect(created).toEqual(expect.arrayContaining(['codex', 'claude', 'agy', 'grok']));
+
+    const slow: AteamEvent[] = [];
+    const cancellable = new Simulator(event => slow.push(event));
+    cancellable.run('Slow work', 'SLOW');
+    await vi.advanceTimersByTimeAsync(500);
+    cancellable.cancel();
+    expect(slow.some(event => event.type === 'AgentAvailabilityChanged' && event.availability === 'READY' && event.agentId === 'codex')).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('emits tool events and isolated auth failures', async () => {
+    vi.useFakeTimers();
+    const events: AteamEvent[] = [];
+    const simulator = new Simulator(event => events.push(event));
+    simulator.run('Heavy tool task', 'TOOL_HEAVY');
+    await vi.runAllTimersAsync();
+    expect(events.some(event => event.type === 'ToolStarted')).toBe(true);
+    expect(events.some(event => event.type === 'ToolFinished')).toBe(true);
+
+    const auth: AteamEvent[] = [];
+    const failing = new Simulator(event => auth.push(event));
+    failing.run('Test auth scenario', 'AUTH_FAILURE');
+    await vi.runAllTimersAsync();
+    expect(auth.some(event => event.type === 'AgentAvailabilityChanged' && event.agentId === 'agy' && event.availability === 'AUTH_ERROR')).toBe(true);
+    vi.useRealTimers();
+  });
+});
+
+describe('classifyMessage', () => {
+  it('recognizes short greetings as conversation, not a task', () => {
+    expect(classifyMessage('Hi')).toBe('CONVERSATION');
+    expect(classifyMessage('hello')).toBe('CONVERSATION');
+    expect(classifyMessage('thanks!')).toBe('CONVERSATION');
+    expect(classifyMessage('  Hey  ')).toBe('CONVERSATION');
+  });
+
+  it('does not misclassify a real request that happens to start with a greeting word', () => {
+    expect(classifyMessage('Hi, please refactor the auth module and add tests')).not.toBe('CONVERSATION');
+  });
+
+  it('still routes real objectives and steering as before', () => {
+    expect(classifyMessage('Refactor auth')).toBe('ADDITIONAL_TASK');
+    expect(classifyMessage('Do not change the public API')).toBe('NEW_CONSTRAINT');
+    expect(classifyMessage('cancel that work')).toBe('CANCEL_REQUEST');
+    expect(classifyMessage('should we prioritize the auth fix?')).toBe('QUESTION');
   });
 });

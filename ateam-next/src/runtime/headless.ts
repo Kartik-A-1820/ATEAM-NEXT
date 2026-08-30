@@ -4,6 +4,7 @@ import type {AppState} from '../domain/types.js';
 import {RuntimeController} from './runtime.js';
 import type {SimulationScenario} from './simulator.js';
 import type {AteamStore} from '../storage/store.js';
+import {createDefaultProviders, type ProviderMap} from '../providers/registry.js';
 
 export interface HeadlessSimulationResult {
   sessionId: string;
@@ -36,6 +37,34 @@ export async function runHeadlessSimulation(prompt: string, scenario: Simulation
     sessionId: state.sessionId,
     prompt,
     scenario,
+    status,
+    events,
+    finalState: state,
+  };
+}
+
+export async function runHeadlessProviders(prompt: string, store?: AteamStore, providers: ProviderMap = createDefaultProviders()): Promise<HeadlessSimulationResult> {
+  const events: AteamEvent[] = [];
+  let state = initialState(100, 30);
+  store?.createSession(state.sessionId, titleFromPrompt(prompt), state.startedAt);
+  const send = (event: AteamEvent) => {
+    events.push(event);
+    store?.appendEvent(state.sessionId, event);
+    state = reduce(state, event);
+  };
+
+  const runtime = new RuntimeController(send, false, 'FAST', providers);
+  runtime.handle({kind: 'submitUserMessage', message: prompt});
+  await runtime.waitForIdle();
+
+  const failed = Object.values(state.tasks).some(task => task.status === 'FAILED');
+  const cancelled = Object.values(state.tasks).some(task => task.status === 'CANCELLED');
+  const status = failed ? 'failed' : cancelled ? 'cancelled' : 'completed';
+  store?.finishSession(state.sessionId, status, Date.now());
+  return {
+    sessionId: state.sessionId,
+    prompt,
+    scenario: 'FAST',
     status,
     events,
     finalState: state,

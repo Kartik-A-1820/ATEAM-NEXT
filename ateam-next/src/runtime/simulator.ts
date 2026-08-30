@@ -113,10 +113,34 @@ export class Simulator {
   }
 }
 
+const CONVERSATION_PATTERNS: RegExp[] = [
+  /^(hi|hello|hey|hiya|yo|sup|howdy)\b/,
+  /^good\s?(morning|afternoon|evening|night)\b/,
+  /^(thanks|thank you|thx|ty)\b/,
+  /^(ok|okay|cool|nice|great|awesome|got it|sounds good)\b/,
+  /^(bye|goodbye|see ya|later)\b/,
+  /^how('s| is| are) (it going|you|things)\b/,
+  /^what'?s up\b/,
+];
+
+/**
+ * Conservatively narrow: only short, clearly greeting-shaped messages count as
+ * small talk. Anything longer, or that doesn't match one of these openers, is
+ * left to fall through to the task/steering classifiers below — a missed
+ * greeting just gets treated as a task (harmless), while a false positive
+ * here would silently swallow a real request.
+ */
+function looksConversational(message: string): boolean {
+  const trimmed = message.trim().toLowerCase();
+  if (trimmed.length === 0 || trimmed.length > 24) return false;
+  return CONVERSATION_PATTERNS.some(pattern => pattern.test(trimmed));
+}
+
 export function classifyMessage(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes('don\'t') || lower.includes('do not')) return 'NEW_CONSTRAINT';
   if (lower.includes('stop') || lower.includes('cancel')) return 'CANCEL_REQUEST';
+  if (looksConversational(message)) return 'CONVERSATION';
   if (lower.includes('?')) return 'QUESTION';
   if (lower.includes('prioritize')) return 'PRIORITY_CHANGE';
   return 'ADDITIONAL_TASK';

@@ -1,0 +1,4 @@
+{"type":"assistant","text":"First "}
+{"type":"tool_start","name":"inspect"}
+{"type":"tool_result","name":"inspect","result":"ok"}
+{"type":"message_chunk","delta":"second"}

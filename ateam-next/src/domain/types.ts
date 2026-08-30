@@ -18,6 +18,8 @@ export type Verbosity = 'QUIET' | 'NORMAL' | 'VERBOSE' | 'TRACE';
 export type PermissionMode = 'SAFE' | 'STANDARD' | 'FULL';
 export type TaskStatus = 'PENDING' | 'READY' | 'RUNNING' | 'BLOCKED' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'INVALIDATED';
 export type TabName = 'Plan' | 'Agents' | 'Tasks' | 'Diff' | 'Context' | 'Logs';
+export type PipelinePhase = 'PLAN' | 'DISTRIBUTE' | 'IMPLEMENT' | 'VALIDATE' | 'IDLE';
+export type TaskKind = 'analysis' | 'implementation' | 'review' | 'verification' | 'planning';
 
 export interface AgentState {
   id: AgentId;
@@ -29,6 +31,16 @@ export interface AgentState {
   version?: string;
   runningTaskCount: number;
   lastError?: string;
+  currentTaskId?: string;
+  currentTaskObjective?: string;
+  cooldownUntil?: number;
+  cooldownReason?: string;
+}
+
+export interface TaskAttempt {
+  agentId: AgentId;
+  reason: string;
+  at: number;
 }
 
 export interface ConversationEntry {
@@ -37,6 +49,7 @@ export interface ConversationEntry {
   text: string;
   time: number;
   level: Verbosity;
+  taskId?: string;
 }
 
 export interface TaskNode {
@@ -46,6 +59,8 @@ export interface TaskNode {
   assignedAgent?: AgentId;
   dependencies: string[];
   priority: number;
+  kind?: TaskKind;
+  attempts?: TaskAttempt[];
 }
 
 export interface AppState {
@@ -56,10 +71,13 @@ export interface AppState {
   activeTab: TabName;
   verbosity: Verbosity;
   permissionMode: PermissionMode;
+  pipelinePhase: PipelinePhase;
+  planSummary?: string;
   agents: Record<AgentId, AgentState>;
   conversation: ConversationEntry[];
   tasks: Record<string, TaskNode>;
   running: boolean;
   quitting: boolean;
   log: string[];
+  openStreams?: Record<string, string>;
 }

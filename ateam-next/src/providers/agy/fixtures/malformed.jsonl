@@ -1,0 +1,4 @@
+{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ok"}}
+not-valid-json
+{"type":"unknown.future.event","payload":{"extra":true},"_reserved":{"v":2}}
+{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" after bad line"}}

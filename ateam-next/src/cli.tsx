@@ -5,9 +5,10 @@ import {render} from 'ink';
 import process from 'node:process';
 import {App} from './tui/App.js';
 import type {SimulationScenario} from './runtime/simulator.js';
-import {runHeadlessSimulation} from './runtime/headless.js';
+import {runHeadlessProviders, runHeadlessSimulation} from './runtime/headless.js';
 import {AteamStore} from './storage/store.js';
-import {formatSessionList, replaySession} from './storage/session.js';
+import {isOnCooldown} from './domain/agentHealth.js';
+import {formatSessionList, replaySession, replaySessionHealth} from './storage/session.js';
 import {formatDoctor, runDoctor} from './doctor/doctor.js';
 import {CodexAdapter} from './providers/codex/adapter.js';
 import {formatAgentEvents} from './agents/format.js';
@@ -41,13 +42,16 @@ program.command('run')
   .argument('<prompt>')
   .option('--json', 'emit structured JSON')
   .option('--simulate', 'use simulated execution', false)
+  .option('--provider <provider>', 'all|codex', 'all')
   .option('--scenario <scenario>', 'simulation scenario for --simulate', 'STREAMING')
-  .action(async (prompt: string, options: {json?: boolean; simulate?: boolean; scenario?: string}, command: Command) => {
-    const localOptions = typeof command.opts === 'function' ? command.opts<{json?: boolean; simulate?: boolean; scenario?: string}>() : options;
+  .action(async (prompt: string, options: {json?: boolean; simulate?: boolean; scenario?: string; provider?: string}, command: Command) => {
+    const localOptions = typeof command.opts === 'function' ? command.opts<{json?: boolean; simulate?: boolean; scenario?: string; provider?: string}>() : options;
     const store = new AteamStore();
     const result = localOptions.simulate
       ? await runHeadlessSimulation(prompt, normalizeScenario(localOptions.scenario ?? 'STREAMING'), store)
-      : await runCodexHeadless(prompt, store);
+      : localOptions.provider === 'codex'
+        ? await runCodexHeadless(prompt, store)
+        : await runHeadlessProviders(prompt, store);
     if (localOptions.json) {
       process.stdout.write(`${JSON.stringify(result)}\n`);
     } else {
@@ -85,13 +89,18 @@ program.command('resume').description('resume a session').argument('[sessionId]'
     return;
   }
   const state = replaySession(store, target.id);
-  const payload = {session: target, messages: state?.conversation ?? [], tasks: state?.tasks ?? {}};
+  const initialHealth = replaySessionHealth(store, target.id);
+  const health = Object.values(initialHealth).flatMap(entry => {
+    if (!entry || !isOnCooldown(entry)) return [];
+    return [{agentId: entry.id, cooldownUntil: entry.cooldownUntil, cooldownReason: entry.cooldownReason}];
+  });
+  const payload = {session: target, messages: state?.conversation ?? [], tasks: state?.tasks ?? {}, health};
   if (options.json) {
     process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
     store.close();
     return;
   }
-  const instance = render(<App simulate={true} scenario="STREAMING" store={store} initial={state} sessionMode="resume" />);
+  const instance = render(<App simulate={true} scenario="STREAMING" store={store} initial={state} sessionMode="resume" initialHealth={initialHealth} />);
   await instance.waitUntilExit();
   store.close();
 });

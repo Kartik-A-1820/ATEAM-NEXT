@@ -1,0 +1,4 @@
+{"type":"assistant","text":"First "}
+{"type":"tool_start","name":"Read"}
+{"type":"tool_result","name":"Read","result":"ok"}
+{"type":"assistant","text":"second"}

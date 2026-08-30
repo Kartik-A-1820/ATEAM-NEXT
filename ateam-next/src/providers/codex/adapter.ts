@@ -1,9 +1,9 @@
 import {runProcess, streamProcess} from '../../process/runner.js';
-import type {AteamEvent, ProviderAdapter} from '../../domain/events.js';
+import type {AteamEvent, ExecutableProviderAdapter} from '../../domain/events.js';
 import type {AgentAvailability} from '../../domain/types.js';
-import {parseCodexJsonl} from './parser.js';
+import {classifyCodexFailureText, parseCodexJsonl} from './parser.js';
 
-export class CodexAdapter implements ProviderAdapter {
+export class CodexAdapter implements ExecutableProviderAdapter {
   readonly id = 'codex' as const;
   private abortController?: AbortController;
 
@@ -35,21 +35,63 @@ export class CodexAdapter implements ProviderAdapter {
   }
 
   async runOnce(message: string): Promise<AteamEvent[]> {
+    const events: AteamEvent[] = [];
+    await this.runStreaming(message, event => events.push(event), new AbortController().signal);
+    return events;
+  }
+
+  async runStreaming(message: string, onEvent: (event: AteamEvent) => void, signal: AbortSignal): Promise<void> {
     this.abortController = new AbortController();
-    const result = await streamProcess({
-      executable: this.executable,
-      args: ['exec', '--cd', this.cwd, '--skip-git-repo-check', '--json', '-'],
-      cwd: this.cwd,
-      stdin: message,
-      signal: this.abortController.signal,
-    });
+    const forwardAbort = () => void this.cancel();
+    if (signal.aborted) forwardAbort();
+    else signal.addEventListener('abort', forwardAbort, {once: true});
+
+    let stdoutBuffer = '';
+    let emittedCount = 0;
+    const emitLine = (line: string) => {
+      for (const event of parseCodexJsonl(line)) {
+        emittedCount += 1;
+        onEvent(event);
+      }
+    };
+    const emitStdoutChunk = (chunk: string) => {
+      stdoutBuffer += chunk;
+      const lines = stdoutBuffer.split('\n');
+      stdoutBuffer = lines.pop() ?? '';
+      for (const line of lines) {
+        emitLine(line.endsWith('\r') ? line.slice(0, -1) : line);
+      }
+    };
+
+    let result: Awaited<ReturnType<typeof streamProcess>>;
+    try {
+      result = await streamProcess({
+        executable: this.executable,
+        args: ['exec', '--cd', this.cwd, '--skip-git-repo-check', '--json', '-'],
+        cwd: this.cwd,
+        stdin: message,
+        signal: this.abortController.signal,
+        onStdout: emitStdoutChunk,
+      });
+    } finally {
+      signal.removeEventListener('abort', forwardAbort);
+    }
+
+    if (stdoutBuffer.length > 0) {
+      emitLine(stdoutBuffer.endsWith('\r') ? stdoutBuffer.slice(0, -1) : stdoutBuffer);
+    }
     if (result.timedOut || result.aborted) {
-      return [{type: 'RuntimeError', message: result.timedOut ? 'Codex execution timed out' : 'Codex execution aborted', at: Date.now()}];
+      onEvent({type: 'RuntimeError', message: result.timedOut ? 'Codex execution timed out' : 'Codex execution aborted', at: Date.now()});
+      return;
     }
+    const combined = `${result.stdout}\n${result.stderr}`;
     if (result.exitCode !== 0 && result.stdout.trim().length === 0) {
-      return [{type: 'RuntimeError', message: result.stderr.trim() || `Codex exited ${result.exitCode}`, at: Date.now()}];
+      onEvent(classifyCodexFailureText(result.stderr.trim() || `Codex exited ${result.exitCode}`));
+      return;
     }
-    return parseCodexJsonl(result.stdout);
+    if (result.exitCode !== 0 && emittedCount === 0) {
+      onEvent(classifyCodexFailureText(combined.trim() || `Codex exited ${result.exitCode}`));
+    }
   }
 
   async cancel(): Promise<void> {
