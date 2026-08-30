@@ -34,13 +34,13 @@ export class CodexAdapter implements ExecutableProviderAdapter {
     });
   }
 
-  async runOnce(message: string): Promise<AteamEvent[]> {
+  async runOnce(message: string, images?: string[]): Promise<AteamEvent[]> {
     const events: AteamEvent[] = [];
-    await this.runStreaming(message, event => events.push(event), new AbortController().signal);
+    await this.runStreaming(message, event => events.push(event), new AbortController().signal, images);
     return events;
   }
 
-  async runStreaming(message: string, onEvent: (event: AteamEvent) => void, signal: AbortSignal): Promise<void> {
+  async runStreaming(message: string, onEvent: (event: AteamEvent) => void, signal: AbortSignal, images?: string[]): Promise<void> {
     this.abortController = new AbortController();
     const forwardAbort = () => void this.cancel();
     if (signal.aborted) forwardAbort();
@@ -67,7 +67,7 @@ export class CodexAdapter implements ExecutableProviderAdapter {
     try {
       result = await streamProcess({
         executable: this.executable,
-        args: ['exec', '--cd', this.cwd, '--skip-git-repo-check', '--json', '-'],
+        args: ['exec', '--cd', this.cwd, '--skip-git-repo-check', '--json', ...imageArgs(images), '-'],
         cwd: this.cwd,
         stdin: message,
         signal: this.abortController.signal,
@@ -101,6 +101,10 @@ export class CodexAdapter implements ExecutableProviderAdapter {
   async shutdown(): Promise<void> {
     await this.cancel();
   }
+}
+
+function imageArgs(images: string[] | undefined): string[] {
+  return images?.flatMap(image => ['-i', image]) ?? [];
 }
 
 function extractVersion(output: string): string | undefined {

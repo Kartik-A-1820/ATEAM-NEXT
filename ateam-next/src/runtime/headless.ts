@@ -53,7 +53,7 @@ export async function runHeadlessProviders(prompt: string, store?: AteamStore, p
     state = reduce(state, event);
   };
 
-  const runtime = new RuntimeController(send, false, 'FAST', providers);
+  const runtime = new RuntimeController(send, false, 'FAST', providers, undefined, store);
   runtime.handle({kind: 'submitUserMessage', message: prompt});
   await runtime.waitForIdle();
 

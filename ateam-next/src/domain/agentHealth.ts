@@ -22,6 +22,10 @@ export interface AgentHealth {
   cooldownReason?: string;
   cooldownKind?: CooldownKind;
   lastSeenAt?: number;
+  /** Observed, not invented: real counts/timings from actual dispatches, for /usage. */
+  totalRuns?: number;
+  totalSuccesses?: number;
+  rollingLatencyMs?: number;
 }
 
 const BACKOFF_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000];
@@ -56,6 +60,17 @@ export function recordTransientFailure(
     ? options.resetAtMs ?? now + AUTH_RECHECK_MS
     : options.resetAtMs ?? now + jitter(BACKOFF_MS[Math.min(consecutiveFailures - 1, BACKOFF_MS.length - 1)]);
   return {...health, consecutiveFailures, cooldownUntil, cooldownReason: options.reason, cooldownKind: kind, lastSeenAt: now};
+}
+
+/** Tracks real observed run outcomes/latency for /usage — separate from the
+ * cooldown bookkeeping above, and never invented when no runs have happened yet. */
+export function recordRunOutcome(health: AgentHealth, options: {success: boolean; durationMs: number}): AgentHealth {
+  const totalRuns = (health.totalRuns ?? 0) + 1;
+  const totalSuccesses = (health.totalSuccesses ?? 0) + (options.success ? 1 : 0);
+  const rollingLatencyMs = health.rollingLatencyMs === undefined
+    ? options.durationMs
+    : Math.round(health.rollingLatencyMs * 0.7 + options.durationMs * 0.3);
+  return {...health, totalRuns, totalSuccesses, rollingLatencyMs};
 }
 
 /**

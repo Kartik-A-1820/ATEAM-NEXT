@@ -295,9 +295,16 @@ Fix: key streaming entries by `(agentId, taskId)`, not just `agentId`.
 
 ## Part D — Full verbosity / observability
 
-**Status: attempt history implemented** (`TaskNode.attempts`, populated on
-`TaskAssigned`/`TaskReassigned`, shown in the Tasks tab). The TRACE-level
-context-packet surfacing and `/usage` latency stats are still open.
+**Status: fully implemented.** Attempt history (`TaskNode.attempts`,
+populated on `TaskAssigned`/`TaskReassigned`, shown in the Tasks tab).
+TRACE-level context-packet surfacing: a new `ContextPacketCompiled` event,
+gated at the *source* (only emitted when verbosity is already `TRACE`, not
+just filtered at display) since a compiled prompt can be sizeable and this
+is an opt-in debugging aid, not something logged every run. `/usage` now
+reports real observed data per agent (`AgentHealth` gained `totalRuns`/
+`totalSuccesses`/`rollingLatencyMs`, updated via a new `recordRunOutcome`
+call around every real dispatch) — still no invented quota numbers, just
+honest counts of what actually happened this session.
 
 The `Verbosity` (`QUIET/NORMAL/VERBOSE/TRACE`) + per-event level tagging in
 `reduce()` is the right mechanism; it's just underused. Additions:
@@ -355,19 +362,31 @@ Header (`tui/App.tsx` `Header`, line 224) and the Agents tab
 
 ## Part F — UI/UX polish pass (reach Claude Code/Codex/Grok-CLI level)
 
-**Status: items 1–3 implemented** (delegated: Codex CLI did the real Diff
-tab + first-run empty state; Grok CLI did markdown-lite rendering + tool-call
-visual cards, both full-permission, disjoint file ownership, independently
-verified — 224 tests pass, build/lint clean). Item 4 was mostly already
-covered by an earlier structural refactor that split `App.tsx` into
-per-tab view components (`AgentsView.tsx`, `TasksView.tsx`, `LogsView.tsx`,
+**Status: fully implemented.** Items 1–3 (real Diff tab, first-run empty
+state, markdown-lite rendering, tool-call visual cards) delivered by Codex
+and Grok CLI as described below. Item 4 was mostly already covered by an
+earlier structural refactor that split `App.tsx` into per-tab view
+components (`AgentsView.tsx`, `TasksView.tsx`, `LogsView.tsx`,
 `ContextView.tsx`, `DiffView.tsx`, `ConversationView.tsx`, `Header.tsx`,
-`StatusBar.tsx`), each already taking `height`/`width` props. Item 5
-(command palette autocomplete) is **not done** — deliberately deferred
-because it would touch `InputBox.tsx`, which the same session round used
-for the paste-compaction/image-attachment work (Part K below); doing both
-concurrently in the same file risked a conflict, so autocomplete stayed out
-of scope this round.
+`StatusBar.tsx`), each already taking `height`/`width` props, and Header/
+StatusBar were further extended (see below) with richer per-agent badges.
+Item 5 (command palette autocomplete) is now implemented too: a pure
+`slashAutocomplete`/`completeSlashInput` pair in `commands/registry.ts`
+(command-name prefix matching, plus `agent:` fragment completion to the
+four agent ids), wired into `InputBox.tsx` with Tab-to-complete. It was
+deliberately deferred in the prior round specifically to avoid touching
+`InputBox.tsx` at the same time as the paste-compaction work (Part K); once
+that landed, this round scheduled autocomplete on a disjoint file set from
+the concurrent `InputBox.tsx` editor (paste/image work was already done by
+then, so there was no actual conflict this time).
+
+**Header/status badge richness** (extends item 3's spirit to the header,
+not originally itemized): `format.ts` gained `formatAgentBadgeStatus`/
+`formatAgentGlance` — a running agent's badge now shows a truncated
+objective snippet (`READY ×1 implement authentic...`), a cooling agent
+shows a live countdown (`cooling 4m 12s`) via the already-existing
+`formatCooldownCountdown`, and the status bar's compact glance line omits
+idle/unavailable agents entirely so only what's actually happening shows.
 
 This is the presentation layer built on top of Parts A–E's better data.
 Concrete, scoped changes to `tui/`:
@@ -436,15 +455,24 @@ every event, session, task, and memory. Additions:
 
 ## Part H — Shared knowledge graph context (large codebases, lower token spend)
 
-**Status: v1 implemented** (delegated to Codex CLI, full-permission), with
-one deliberate scope reduction from the design below: the graph is
-**in-memory only**, rebuilt once per process (on first real task, or via
-`/reindex`) — not persisted to SQLite. Cross-session persistence and the
-`ignore`-package/`.gitignore` handling are both deferred; the current
-implementation uses a small hand-rolled directory-exclusion list instead
-(`node_modules`, `.git`, `dist`, `build`, `coverage`, `.next`, `out`,
-`.orchestrator`) to avoid adding a new dependency or touching `package.json`
-in an unattended background task. New modules: `knowledge/indexer.ts`
+**Status: fully implemented, including SQLite persistence.** Query-time
+storage is still `.gitignore`-package-free — the small hand-rolled
+directory-exclusion list (`node_modules`, `.git`, `dist`, `build`,
+`coverage`, `.next`, `out`, `.orchestrator`) stayed, no new dependency
+added. Cross-session persistence landed in a follow-up round: `AteamStore`
+(`storage/store.ts`) gained two tables (`knowledge_graph_files`,
+`knowledge_graph_symbols`, migration version 3, same pattern as its other
+tables) and `saveGraphOutlines()`/`loadGraphOutlines()`. `knowledge/graph.ts`
+gained `loadPersistedGraphStore()`/`savePersistedGraphStore()`, both
+fail-open (a missing/throwing store degrades to an empty/unsaved graph,
+never blocks). `RuntimeController`'s constructor gained an optional
+`knowledgeStore` parameter — on construction it loads whatever was
+persisted (even if stale) so the very first task prompt has *something*;
+a background reindex still runs on the first real task and, once done,
+replaces the in-memory graph and persists the fresh result for next time.
+`App.tsx`/`headless.ts` thread the same `AteamStore` instance already used
+for session persistence through to this parameter — one store, one file,
+no new storage engine, exactly as originally specified below. New modules: `knowledge/indexer.ts`
 (syntactic-only TS Compiler API walk — no `ts.Program`/type-checker, kept
 deliberately lightweight), `knowledge/graph.ts` (in-memory `CodeGraphStore`),
 `knowledge/query.ts` (`queryRelevantContext` keyword scoring +
@@ -683,14 +711,30 @@ data structure):
   on failure (e.g. nothing on the clipboard, or the platform tool isn't
   installed) — no new event/prop plumbing needed for the failure path,
   it's just literal editable text the user can delete.
-- **Deliberately out of scope**: passing images through to providers via a
-  structured channel (e.g. Codex's own `-i <file>` flag). The image path is
-  embedded as text in the prompt sent to whichever agent runs the task;
-  this doesn't require touching `ExecutableProviderAdapter` or any of the
-  four adapters again, but it does mean attachment quality depends on the
-  agent's own ability to read a file path it's told about, not a first-class
-  multimodal attachment. Flagged as a future enhancement, not built now,
-  to avoid re-touching all four adapters for a nice-to-have.
+- **Status: fully implemented, including first-class passthrough where a
+  provider actually supports it.** `ExecutableProviderAdapter.runOnce`/
+  `runStreaming` now take an optional `images?: string[]` parameter, and
+  `RuntimeController` tracks the current submission's attachments
+  (`currentImages`) and threads them through `executeAssignedTask` on every
+  dispatch. Per adapter:
+  - **Codex** (`providers/codex/adapter.ts`): real structured attachment —
+    `imageArgs()` maps each path to a `-i <file>` pair (confirmed via
+    `codex exec --help`: `-i, --image <FILE>...` is a real, repeatable
+    flag), so Codex receives images as first-class multimodal input, not
+    text.
+  - **Claude, AGY, Grok** (`providers/{claude,agy,grok}/adapter.ts`): all
+    three accept the same `images?` parameter for interface uniformity,
+    but each `*RunOnceArgs()` helper does `void images;` and ignores it,
+    because none of their `--help` output exposes an image-attachment flag
+    on the noninteractive path used here. This was verified against each
+    CLI's actual help text rather than assumed — inventing a workaround
+    (e.g. re-embedding a path as text) would have silently misrepresented
+    attachment quality, so the honest "accepted but unsupported" shape was
+    kept instead.
+  - The `/paste-image` and auto-detected-path placeholders (K1) still also
+    embed a human-readable path reference in the submitted text itself, so
+    even on providers without a real flag, the agent at least sees the file
+    path and can read it manually.
 
 ---
 

@@ -8,11 +8,20 @@ export interface InputEditorState {
   historyIndex?: number;
   /** Placeholder text (e.g. "[4000 chars pasted #1]") -> the real text it expands to at submit time. */
   pastes: Record<string, string>;
+  /** Placeholder text -> raw absolute image path, for placeholders that are image attachments.
+   * A subset of pastes' keys — every image placeholder is also in pastes (with a textual fallback
+   * expansion), so an adapter without real image support still gets a path mentioned in the text. */
+  images: Record<string, string>;
   pasteCounter: number;
 }
 
+export interface SubmitResult {
+  text: string;
+  images: string[];
+}
+
 export function createInputEditor(): InputEditorState {
-  return {value: '', cursor: 0, history: [], pastes: {}, pasteCounter: 0};
+  return {value: '', cursor: 0, history: [], pastes: {}, images: {}, pasteCounter: 0};
 }
 
 export type EditKey =
@@ -36,7 +45,7 @@ const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bm
 export function insertText(state: InputEditorState, text: string): InputEditorState {
   const imagePath = detectImagePath(text);
   if (imagePath) {
-    return insertPlaceholder(state, `[image attached #${state.pasteCounter + 1}: ${basename(imagePath)}]`, `(attached image: ${imagePath})`);
+    return insertPlaceholder(state, `[image attached #${state.pasteCounter + 1}: ${basename(imagePath)}]`, `(attached image: ${imagePath})`, imagePath);
   }
   const inserted = charsOf(text);
   if (inserted.length > PASTE_COMPACT_THRESHOLD) {
@@ -49,10 +58,10 @@ export function insertText(state: InputEditorState, text: string): InputEditorSt
 
 /** Inserts an image reference placeholder at the cursor, e.g. from a clipboard-image capture. */
 export function insertImagePlaceholder(state: InputEditorState, imagePath: string): InputEditorState {
-  return insertPlaceholder(state, `[image attached #${state.pasteCounter + 1}: ${basename(imagePath)}]`, `(attached image: ${imagePath})`);
+  return insertPlaceholder(state, `[image attached #${state.pasteCounter + 1}: ${basename(imagePath)}]`, `(attached image: ${imagePath})`, imagePath);
 }
 
-function insertPlaceholder(state: InputEditorState, placeholder: string, expansion: string): InputEditorState {
+function insertPlaceholder(state: InputEditorState, placeholder: string, expansion: string, imagePath?: string): InputEditorState {
   const chars = charsOf(state.value);
   const placeholderChars = charsOf(placeholder);
   chars.splice(state.cursor, 0, ...placeholderChars);
@@ -62,6 +71,7 @@ function insertPlaceholder(state: InputEditorState, placeholder: string, expansi
     cursor: state.cursor + placeholderChars.length,
     historyIndex: undefined,
     pastes: {...state.pastes, [placeholder]: expansion},
+    images: imagePath === undefined ? state.images : {...state.images, [placeholder]: imagePath},
     pasteCounter: state.pasteCounter + 1,
   };
 }
@@ -132,14 +142,17 @@ function placeholderStartingAt(state: InputEditorState, start: number): string |
   return undefined;
 }
 
-export function submit(state: InputEditorState): {state: InputEditorState; submitted?: string} {
+export function submit(state: InputEditorState): {state: InputEditorState; submitted?: SubmitResult} {
   const expanded = expandPastes(state.value, state.pastes);
   if (expanded.trim().length === 0) {
     return {state};
   }
+  const images = Object.entries(state.images)
+    .filter(([placeholder]) => state.value.includes(placeholder))
+    .map(([, path]) => path);
   return {
-    submitted: expanded,
-    state: {value: '', cursor: 0, history: [...state.history, expanded].slice(-100), historyIndex: undefined, pastes: {}, pasteCounter: 0},
+    submitted: {text: expanded, images},
+    state: {value: '', cursor: 0, history: [...state.history, expanded].slice(-100), historyIndex: undefined, pastes: {}, images: {}, pasteCounter: 0},
   };
 }
 
@@ -210,5 +223,9 @@ function removeRange(state: InputEditorState, from: number, to: number, removedP
   const nextPastes = removedPlaceholder && removedPlaceholder in pastes
     ? Object.fromEntries(Object.entries(pastes).filter(([key]) => key !== removedPlaceholder))
     : pastes;
-  return {...state, value: chars.join(''), cursor: from, pastes: nextPastes};
+  const images = state.images;
+  const nextImages = removedPlaceholder && removedPlaceholder in images
+    ? Object.fromEntries(Object.entries(images).filter(([key]) => key !== removedPlaceholder))
+    : images;
+  return {...state, value: chars.join(''), cursor: from, pastes: nextPastes, images: nextImages};
 }

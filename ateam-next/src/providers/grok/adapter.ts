@@ -70,15 +70,15 @@ export class GrokAdapter implements ExecutableProviderAdapter {
     });
   }
 
-  async runOnce(message: string): Promise<AteamEvent[]> {
+  async runOnce(message: string, images?: string[]): Promise<AteamEvent[]> {
     const events: AteamEvent[] = [];
     await this.runStreaming(message, event => {
       events.push(event);
-    }, new AbortController().signal);
+    }, new AbortController().signal, images);
     return events;
   }
 
-  async runStreaming(message: string, onEvent: (event: AteamEvent) => void, signal: AbortSignal): Promise<void> {
+  async runStreaming(message: string, onEvent: (event: AteamEvent) => void, signal: AbortSignal, images?: string[]): Promise<void> {
     this.abortController = new AbortController();
     const at = Date.now();
     const onAbort = () => this.abortController?.abort();
@@ -97,7 +97,7 @@ export class GrokAdapter implements ExecutableProviderAdapter {
     try {
       result = await this.io.stream({
         executable: this.executable,
-        args: grokRunOnceArgs(message, this.cwd),
+        args: grokRunOnceArgs(message, this.cwd, images),
         cwd: this.cwd,
         signal: this.abortController.signal,
         onStdout: chunk => {
@@ -148,7 +148,9 @@ export class GrokAdapter implements ExecutableProviderAdapter {
   }
 }
 
-export function grokRunOnceArgs(prompt: string, cwd: string): string[] {
+/** `grok --help` has no image-attachment flag on `-p`/`--single`. Images are ignored. */
+export function grokRunOnceArgs(prompt: string, cwd: string, images?: string[]): string[] {
+  void images;
   return ['-p', prompt, '--cwd', cwd, '--output-format', 'json'];
 }
 

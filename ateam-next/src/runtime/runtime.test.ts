@@ -141,11 +141,58 @@ describe('RuntimeController', () => {
     const runtime = new RuntimeController(event => events.push(event), true, 'FAST');
 
     runtime.handle({kind: 'slashCommand', name: 'reindex', args: []});
-    await vi.waitFor(() => expect(events.some(event => event.type === 'KnowledgeGraphIndexed')).toBe(true));
+    // Real, unmocked filesystem scan of this repo — give it real headroom under
+    // parallel test-suite load instead of vitest's tight default waitFor timeout.
+    await vi.waitFor(() => expect(events.some(event => event.type === 'KnowledgeGraphIndexed')).toBe(true), {timeout: 10_000});
 
     const indexed = events.find(event => event.type === 'KnowledgeGraphIndexed');
     expect(indexed?.type === 'KnowledgeGraphIndexed' ? indexed.fileCount : 0).toBeGreaterThan(0);
     expect(events.some(event => event.type === 'PlanUpdated' && event.summary.includes('Knowledge graph reindexed'))).toBe(true);
+  });
+
+  it('loads a persisted knowledge graph on construction instead of starting empty', () => {
+    const events: AteamEvent[] = [];
+    const outline = {path: 'src/example.ts', language: 'typescript', symbols: [
+      {file: 'src/example.ts', name: 'doThing', kind: 'function', signature: 'function doThing()', startLine: 1, endLine: 1, exported: true},
+    ]};
+    const knowledgeStore = {
+      loadGraphOutlines: () => [outline],
+      saveGraphOutlines: () => undefined,
+    };
+    const runtime = new RuntimeController(event => events.push(event), false, 'FAST', {}, undefined, knowledgeStore);
+
+    runtime.handle({kind: 'slashCommand', name: 'graph', args: []});
+
+    expect(events.some(event => event.type === 'PlanUpdated' && event.summary.includes('loaded from a previous session') && event.summary.includes('1 files'))).toBe(true);
+  });
+
+  it('persists the knowledge graph after a manual reindex', async () => {
+    const events: AteamEvent[] = [];
+    const saved: unknown[] = [];
+    const knowledgeStore = {
+      loadGraphOutlines: () => [],
+      saveGraphOutlines: (outlines: unknown[]) => { saved.push(...outlines); },
+    };
+    const runtime = new RuntimeController(event => events.push(event), true, 'FAST', undefined, undefined, knowledgeStore);
+
+    runtime.handle({kind: 'slashCommand', name: 'reindex', args: []});
+    await vi.waitFor(() => expect(events.some(event => event.type === 'KnowledgeGraphIndexed')).toBe(true), {timeout: 10_000});
+
+    expect(saved.length).toBeGreaterThan(0);
+  });
+
+  it('fails open when the knowledge store throws on load or save', async () => {
+    const events: AteamEvent[] = [];
+    const knowledgeStore = {
+      loadGraphOutlines: () => { throw new Error('db locked'); },
+      saveGraphOutlines: () => { throw new Error('db locked'); },
+    };
+    const runtime = new RuntimeController(event => events.push(event), true, 'FAST', undefined, undefined, knowledgeStore);
+
+    runtime.handle({kind: 'slashCommand', name: 'reindex', args: []});
+    await vi.waitFor(() => expect(events.some(event => event.type === 'KnowledgeGraphIndexed')).toBe(true), {timeout: 10_000});
+
+    expect(events.some(event => event.type === 'RuntimeError')).toBe(false);
   });
 
   it('replies to small talk without launching the plan pipeline (simulate mode)', () => {
@@ -441,6 +488,58 @@ describe('RuntimeController', () => {
     runtime.handle({kind: 'stop', scope: 'all'});
 
     await vi.waitFor(() => expect(cancel).toHaveBeenCalledWith('all'));
+  });
+
+  it('passes attached images through to the provider', async () => {
+    const events: AteamEvent[] = [];
+    const seenImages: (string[] | undefined)[] = [];
+    const codex: ExecutableProviderAdapter = {
+      id: 'codex',
+      async probe() { return {availability: 'READY' as const}; },
+      async startSession() { return undefined; },
+      async send() { return undefined; },
+      async runOnce() { return []; },
+      async runStreaming(_message, onEvent, _signal, images) {
+        seenImages.push(images);
+        onEvent({type: 'AgentStreamDelta', agentId: 'codex', delta: 'done', at: Date.now()});
+      },
+      async cancel() { return undefined; },
+      async shutdown() { return undefined; },
+    };
+    const runtime = new RuntimeController(event => events.push(event), false, 'FAST', {codex});
+
+    runtime.handle({kind: 'submitUserMessage', message: 'Fix auth', images: ['/tmp/screenshot.png']});
+    await runtime.waitForIdle();
+
+    expect(seenImages.some(images => images?.includes('/tmp/screenshot.png'))).toBe(true);
+  });
+
+  it('surfaces the compiled context packet only at TRACE verbosity', async () => {
+    const events: AteamEvent[] = [];
+    const codex = fakeProvider('codex', async () => [{type: 'AgentStreamDelta', agentId: 'codex', delta: 'done', at: Date.now()}]);
+    const runtime = new RuntimeController(event => events.push(event), false, 'FAST', {codex});
+
+    runtime.handle({kind: 'submitUserMessage', message: 'Fix auth'});
+    await runtime.waitForIdle();
+    expect(events.some(event => event.type === 'ContextPacketCompiled')).toBe(false);
+
+    events.length = 0;
+    runtime.handle({kind: 'setVerbosity', verbosity: 'TRACE'});
+    runtime.handle({kind: 'submitUserMessage', message: 'Fix auth again'});
+    await runtime.waitForIdle();
+    expect(events.some(event => event.type === 'ContextPacketCompiled')).toBe(true);
+  });
+
+  it('reports real observed run stats via /usage after a completed task', async () => {
+    const events: AteamEvent[] = [];
+    const codex = fakeProvider('codex', async () => [{type: 'AgentStreamDelta', agentId: 'codex', delta: 'done', at: Date.now()}]);
+    const runtime = new RuntimeController(event => events.push(event), false, 'FAST', {codex});
+
+    runtime.handle({kind: 'submitUserMessage', message: 'Fix auth'});
+    await runtime.waitForIdle();
+    runtime.handle({kind: 'slashCommand', name: 'usage', args: []});
+
+    expect(events.some(event => event.type === 'PlanUpdated' && event.summary.includes('run') && event.summary.includes('% succeeded'))).toBe(true);
   });
 });
 

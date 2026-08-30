@@ -102,15 +102,15 @@ export class AgyAdapter implements ExecutableProviderAdapter {
    * the normalized AteamEvents. Thin wrapper around runStreaming so there
    * is a single parsing implementation.
    */
-  async runOnce(message: string): Promise<AteamEvent[]> {
+  async runOnce(message: string, images?: string[]): Promise<AteamEvent[]> {
     const events: AteamEvent[] = [];
     await this.runStreaming(message, event => {
       events.push(event);
-    }, new AbortController().signal);
+    }, new AbortController().signal, images);
     return events;
   }
 
-  async runStreaming(message: string, onEvent: (event: AteamEvent) => void, signal: AbortSignal): Promise<void> {
+  async runStreaming(message: string, onEvent: (event: AteamEvent) => void, signal: AbortSignal, images?: string[]): Promise<void> {
     this.abortController = new AbortController();
     const onAbort = () => this.abortController?.abort();
     if (signal.aborted) onAbort();
@@ -133,7 +133,7 @@ export class AgyAdapter implements ExecutableProviderAdapter {
     try {
       result = await this.io.stream({
         executable: this.executable,
-        args: ['-p', message, '--output-format', 'json'],
+        args: agyRunOnceArgs(message, images),
         cwd: this.cwd,
         signal: this.abortController.signal,
         onStdout: chunk => {
@@ -186,6 +186,12 @@ export class AgyAdapter implements ExecutableProviderAdapter {
       }
     }
   }
+}
+
+/** `agy --help` has no image-attachment flag on `-p`/`--print`. Images are ignored. */
+export function agyRunOnceArgs(prompt: string, images?: string[]): string[] {
+  void images;
+  return ['-p', prompt, '--output-format', 'json'];
 }
 
 // ---------------------------------------------------------------------------

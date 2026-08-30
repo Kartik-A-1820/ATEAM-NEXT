@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {createAgentHealth, isOnCooldown, parseResetHint, recordSuccess, recordTransientFailure, reduceHealthEvents} from './agentHealth.js';
+import {createAgentHealth, isOnCooldown, parseResetHint, recordRunOutcome, recordSuccess, recordTransientFailure, reduceHealthEvents} from './agentHealth.js';
 import type {AteamEvent} from './events.js';
 
 describe('agentHealth', () => {
@@ -128,5 +128,22 @@ describe('reduceHealthEvents', () => {
       {type: 'TaskCreated', taskId: 'T1', objective: 'implement', at: now},
     ]);
     expect(health).toEqual({});
+  });
+});
+
+describe('recordRunOutcome', () => {
+  it('tracks real run counts and success rate, never inventing a value before any run', () => {
+    let health = createAgentHealth('codex');
+    expect(health.totalRuns).toBeUndefined();
+
+    health = recordRunOutcome(health, {success: true, durationMs: 1000});
+    expect(health.totalRuns).toBe(1);
+    expect(health.totalSuccesses).toBe(1);
+    expect(health.rollingLatencyMs).toBe(1000);
+
+    health = recordRunOutcome(health, {success: false, durationMs: 2000});
+    expect(health.totalRuns).toBe(2);
+    expect(health.totalSuccesses).toBe(1);
+    expect(health.rollingLatencyMs).toBe(Math.round(1000 * 0.7 + 2000 * 0.3));
   });
 });

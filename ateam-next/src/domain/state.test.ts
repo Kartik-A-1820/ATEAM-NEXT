@@ -233,4 +233,13 @@ describe('state reducer', () => {
     expect(state.agents.grok.cooldownUntil).toBeUndefined();
     expect(state.agents.grok.cooldownReason).toBeUndefined();
   });
+
+  it('surfaces a compiled context packet only at TRACE verbosity', () => {
+    let state = initialState();
+    state = reduce(state, {type: 'ContextPacketCompiled', taskId: 'P-T2', agentId: 'codex', packet: 'Task P-T2: implement auth', at: 1});
+    expect(visibleEntries(state).some(entry => entry.text.includes('implement auth'))).toBe(false);
+
+    state = reduce(state, {type: 'VerbosityChanged', verbosity: 'TRACE', at: 2});
+    expect(visibleEntries(state).some(entry => entry.text.includes('implement auth'))).toBe(true);
+  });
 });

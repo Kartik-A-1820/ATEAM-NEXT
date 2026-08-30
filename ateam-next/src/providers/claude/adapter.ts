@@ -32,13 +32,14 @@ export class ClaudeAdapter implements ExecutableProviderAdapter {
     return undefined;
   }
 
-  async runOnce(message: string): Promise<AteamEvent[]> {
+  async runOnce(message: string, images?: string[]): Promise<AteamEvent[]> {
     const events: AteamEvent[] = [];
-    await this.runStreaming(message, event => events.push(event), new AbortController().signal);
+    await this.runStreaming(message, event => events.push(event), new AbortController().signal, images);
     return events;
   }
 
-  async runStreaming(message: string, onEvent: (event: AteamEvent) => void, signal: AbortSignal): Promise<void> {
+  async runStreaming(message: string, onEvent: (event: AteamEvent) => void, signal: AbortSignal, images?: string[]): Promise<void> {
+    void images;
     this.abortController = new AbortController();
     const forwardAbort = () => void this.cancel();
     if (signal.aborted) forwardAbort();

@@ -7,6 +7,7 @@ import type {AgentHealth} from '../domain/agentHealth.js';
 import type {AgentId, AppState, TabName} from '../domain/types.js';
 import type {AteamEvent, RuntimeCommand} from '../domain/events.js';
 import {commandHelp, parseInput} from '../commands/registry.js';
+import type {SubmitResult} from '../input/editor.js';
 import {InputBox} from './InputBox.js';
 import {Header} from './Header.js';
 import {StatusBar, TABS} from './StatusBar.js';
@@ -49,7 +50,7 @@ export function App({simulate, scenario, store, initial, sessionMode = 'new', pr
     setState(current => reduce(current, event));
   };
 
-  const runtime = useMemo(() => new RuntimeController(send, simulate, scenario, undefined, initialHealth), [simulate, scenario, initialHealth]);
+  const runtime = useMemo(() => new RuntimeController(send, simulate, scenario, undefined, initialHealth, store), [simulate, scenario, initialHealth, store]);
 
   React.useEffect(() => {
     if (!probeProviders) return undefined;
@@ -120,8 +121,8 @@ export function App({simulate, scenario, store, initial, sessionMode = 'new', pr
     runtime.handle({kind: 'slashCommand', name: tab.toLowerCase(), args: []});
   };
 
-  const submit = (value: string) => {
-    const parsed = parseInput(value);
+  const submit = ({text, images}: SubmitResult) => {
+    const parsed = parseInput(text);
     if (parsed.kind === 'help') {
       send({type: 'PlanUpdated', summary: commandHelp(parsed.topic), at: Date.now()});
       return;
@@ -129,6 +130,10 @@ export function App({simulate, scenario, store, initial, sessionMode = 'new', pr
     if (parsed.kind === 'quit') {
       runtime.handle(parsed);
       exit();
+      return;
+    }
+    if (parsed.kind === 'submitUserMessage' && images.length > 0) {
+      runtime.handle({...parsed, images});
       return;
     }
     runtime.handle(parsed as RuntimeCommand);

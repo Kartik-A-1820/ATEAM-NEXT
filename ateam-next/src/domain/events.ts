@@ -60,6 +60,7 @@ export const eventSchema = z.discriminatedUnion('type', [
   z.object({type: z.literal('PipelinePhaseChanged'), phase: z.enum(['PLAN', 'DISTRIBUTE', 'IMPLEMENT', 'VALIDATE', 'IDLE']), at: z.number()}),
   z.object({type: z.literal('ConversationCleared'), at: z.number()}),
   z.object({type: z.literal('AteamReplied'), text: z.string(), at: z.number()}),
+  z.object({type: z.literal('ContextPacketCompiled'), taskId: z.string(), agentId, packet: z.string(), at: z.number()}),
 ]);
 
 export type AteamEvent = z.infer<typeof eventSchema>;
@@ -74,7 +75,14 @@ export interface ProviderAdapter {
 }
 
 export interface ExecutableProviderAdapter extends ProviderAdapter {
-  runOnce(message: string): Promise<AteamEvent[]>;
+  /**
+   * images: absolute paths to image files the user attached (see
+   * input/editor.ts's image-placeholder mechanism). Optional and additive —
+   * an adapter that doesn't pass a real attachment flag to its underlying
+   * CLI can simply ignore it; the prompt text already contains a fallback
+   * textual reference to the same path either way, so nothing is lost.
+   */
+  runOnce(message: string, images?: string[]): Promise<AteamEvent[]>;
   /**
    * Same contract as runOnce, but emits each parsed event via onEvent as soon
    * as its line of provider output arrives, instead of buffering the whole
@@ -83,11 +91,11 @@ export interface ExecutableProviderAdapter extends ProviderAdapter {
    * (headless mode, tests) that are fine with a buffered result. signal
    * allows the caller to abort the underlying process mid-run.
    */
-  runStreaming(message: string, onEvent: (event: AteamEvent) => void, signal: AbortSignal): Promise<void>;
+  runStreaming(message: string, onEvent: (event: AteamEvent) => void, signal: AbortSignal, images?: string[]): Promise<void>;
 }
 
 export type RuntimeCommand =
-  | {kind: 'submitUserMessage'; message: string}
+  | {kind: 'submitUserMessage'; message: string; images?: string[]}
   | {kind: 'slashCommand'; name: string; args: string[]}
   | {kind: 'setVerbosity'; verbosity: Verbosity}
   | {kind: 'setPermissionMode'; mode: PermissionMode}

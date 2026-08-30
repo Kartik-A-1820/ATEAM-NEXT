@@ -1,10 +1,11 @@
 import React, {useState} from 'react';
 import {Box, Text, useInput} from 'ink';
-import {applyEdit, createInputEditor, insertImagePlaceholder, insertText, submit} from '../input/editor.js';
+import {completeSlashInput, slashAutocomplete} from '../commands/registry.js';
+import {applyEdit, createInputEditor, insertImagePlaceholder, insertText, submit, type SubmitResult} from '../input/editor.js';
 import {captureClipboardImage} from '../input/clipboardImage.js';
 
 interface Props {
-  onSubmit: (value: string) => void;
+  onSubmit: (value: SubmitResult) => void;
   disabled?: boolean;
   placeholder?: string;
   running?: boolean;
@@ -21,6 +22,13 @@ export function InputBox({onSubmit, disabled = false, placeholder, running = fal
       return;
     }
     if (key.tab) {
+      if (!key.shift) {
+        setEditor(current => {
+          const completed = completeSlashInput(current.value);
+          if (completed === undefined) return current;
+          return {...current, value: completed, cursor: completed.length};
+        });
+      }
       return;
     }
     const submitIndex = firstSubmitIndex(input);
@@ -77,6 +85,7 @@ export function InputBox({onSubmit, disabled = false, placeholder, running = fal
   const cursorChar = chars[editor.cursor] ?? ' ';
   const after = chars.slice(editor.cursor + 1).join('');
   const idle = editor.value.length === 0;
+  const suggestionText = slashAutocomplete(editor.value).suggestions.join('  ');
 
   return (
     <Box borderStyle="single" paddingX={1} minHeight={3} flexDirection="column" flexShrink={0}>
@@ -89,6 +98,8 @@ export function InputBox({onSubmit, disabled = false, placeholder, running = fal
       </Text>
       {idle ? (
         <Text dimColor>{running ? 'running…  ' : ''}shift+enter newline · /commands · /paste-image · tab cycle views</Text>
+      ) : suggestionText ? (
+        <Text dimColor>{suggestionText}</Text>
       ) : null}
     </Box>
   );

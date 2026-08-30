@@ -33,6 +33,54 @@ export const registry: SlashCommandSpec[] = [
   {name: 'quit', usage: '/quit', description: 'Exit Ateam.', parse: () => ({kind: 'quit'})},
 ];
 
+export const AUTOCOMPLETE_LIMIT = 5;
+export const AUTOCOMPLETE_AGENT_IDS = ['codex', 'claude', 'agy', 'grok'] as const;
+
+export type SlashAutocompleteKind = 'commands' | 'agents' | 'none';
+
+export interface SlashAutocomplete {
+  kind: SlashAutocompleteKind;
+  suggestions: string[];
+}
+
+/** Pure slash-command / agent-id hinting for the input box. No runtime I/O. */
+export function slashAutocomplete(input: string, limit = AUTOCOMPLETE_LIMIT): SlashAutocomplete {
+  if (!input.startsWith('/')) {
+    return {kind: 'none', suggestions: []};
+  }
+
+  const agentMatch = /agent:([^\s]*)$/i.exec(input);
+  if (agentMatch) {
+    const typed = agentMatch[1].toLowerCase();
+    const suggestions = AUTOCOMPLETE_AGENT_IDS.filter(id => id.startsWith(typed));
+    return {kind: 'agents', suggestions: [...suggestions]};
+  }
+
+  if (/\s/.test(input)) {
+    return {kind: 'none', suggestions: []};
+  }
+
+  const prefix = input.slice(1).toLowerCase();
+  const suggestions = registry
+    .filter(command => command.name.toLowerCase().startsWith(prefix))
+    .map(command => command.name)
+    .slice(0, limit);
+  return {kind: suggestions.length > 0 ? 'commands' : 'none', suggestions};
+}
+
+/** Tab-complete a unique command name or unique agent: prefix. Undefined if not unique. */
+export function completeSlashInput(input: string): string | undefined {
+  const result = slashAutocomplete(input);
+  if (result.suggestions.length !== 1) return undefined;
+  if (result.kind === 'commands') {
+    return `/${result.suggestions[0]} `;
+  }
+  if (result.kind === 'agents') {
+    return input.replace(/agent:[^\s]*$/i, `agent:${result.suggestions[0]} `);
+  }
+  return undefined;
+}
+
 export function parseInput(input: string): RuntimeCommand | {kind: 'help'; topic?: string} {
   const trimmed = input.trim();
   if (!trimmed.startsWith('/')) {

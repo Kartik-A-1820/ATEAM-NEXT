@@ -12,6 +12,10 @@ describe('grokRunOnceArgs', () => {
   it('uses explicit argv for the structured JSON path', () => {
     expect(grokRunOnceArgs('fix auth', '/repo')).toEqual(['-p', 'fix auth', '--cwd', '/repo', '--output-format', 'json']);
   });
+
+  it('does not invent an image flag when attachments are provided', () => {
+    expect(grokRunOnceArgs('fix auth', '/repo', ['/abs/shot.png'])).toEqual(['-p', 'fix auth', '--cwd', '/repo', '--output-format', 'json']);
+  });
 });
 
 describe('normalizeGrokProbe', () => {
@@ -105,6 +109,19 @@ describe('GrokAdapter', () => {
     expect(seen).toEqual(['-p', 'summarize auth', '--cwd', '/work', '--output-format', 'json']);
     expect(events.some(event => event.type === 'AgentStreamDelta')).toBe(true);
     expect(events.at(-1)).toMatchObject({type: 'AgentAvailabilityChanged', availability: 'READY'});
+  });
+
+  it('runOnce accepts images and leaves argv unchanged when the CLI has no attachment flag', async () => {
+    let seen: string[] | undefined;
+    const adapter = new GrokAdapter('grok', '/work', io({
+      stream: async spec => {
+        seen = spec.args;
+        return result({stdout: readFileSync(join(fixtures, 'normal.json'), 'utf8'), args: spec.args});
+      },
+    }));
+
+    await adapter.runOnce('summarize auth', ['/abs/shot.png']);
+    expect(seen).toEqual(['-p', 'summarize auth', '--cwd', '/work', '--output-format', 'json']);
   });
 
   it('runOnce normalizes empty stdout auth failures', async () => {

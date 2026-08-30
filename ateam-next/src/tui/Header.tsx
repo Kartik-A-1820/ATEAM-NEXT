@@ -1,7 +1,7 @@
 import React from 'react';
 import {Box, Text} from 'ink';
 import type {AppState} from '../domain/types.js';
-import {agentTaskSuffix, derivePhase, formatElapsed, symbolFor} from './format.js';
+import {derivePhase, formatAgentBadgeStatus, formatElapsed, symbolFor} from './format.js';
 
 interface Props {
   state: AppState;
@@ -24,8 +24,7 @@ export function Header({state}: Props) {
         {agents.map((agent, index) => (
           <Text key={agent.id} color={agent.color}>
             {index > 0 ? '   ' : ''}
-            {symbolFor(agent.availability)} {agent.displayName} {agent.availability}
-            {agentTaskSuffix(agent)}
+            {symbolFor(agent.availability)} {agent.displayName} {formatAgentBadgeStatus(agent)}
           </Text>
         ))}
       </Box>

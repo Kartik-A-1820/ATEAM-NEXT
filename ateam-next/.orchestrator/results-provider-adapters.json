@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "elapsed_seconds": 600.2179999999935,
+  "results": [
+    {
+      "task_id": "agy-adapter-implementation",
+      "agent": "agy",
+      "role": "AGY provider adapter implementer",
+      "cwd": "F:\\ATEAM-NEXT\\ateam-next",
+      "full_permission": true,
+      "started_at": "2026-08-30T10:04:45Z",
+      "result": {
+        "command": [
+          "C:\\Users\\karti\\AppData\\Local\\agy\\bin\\agy.EXE",
+          "-p",
+          "ROLE\nYou are implementing the AGY/Antigravity provider adapter for Ateam Next.\n\nOBJECTIVE\nCreate a production-oriented AGY adapter implementation with parser fixtures and tests, limited strictly to the AGY provider directory.\n\nREPOSITORY/CWD\nF:\\ATEAM-NEXT\\ateam-next\n\nRELEVANT FILES\nsrc/domain/events.ts\nsrc/domain/types.ts\nsrc/process/runner.ts\nsrc/providers/codex/adapter.ts\nsrc/providers/codex/parser.ts\nsrc/providers/codex/parser.test.ts\npackage.json\n\nOWNERSHIP BOUNDARIES\nYou may create/edit only files under src/providers/agy/. Do not edit index.ts, cli.tsx, docs, package files, runtime, scheduler, process runner, or other provider directories. Do not commit. Do not push.\n\nIMPLEMENTATION REQUIREMENTS\nImplement AgyAdapter with id 'agy'. Use explicit executable plus argv only. Prefer structured noninteractive JSON path: agy -p <prompt> --output-format json. Probe with agy models or --version; do not fabricate auth/quota. Implement runOnce(message): Promise<AteamEvent[]> even if this is not yet in the shared interface. Normalize completion text into AgentStreamDelta plus READY. Normalize auth failures to AUTH_ERROR, rate limit-looking output to RateLimited, malformed JSON to RuntimeError. Parser should tolerate unknown fields.\n\nTESTING EXPECTED\nAdd tests under src/providers/agy using synthetic fixtures. Run targeted tests if possible.\n\nREQUESTED RESPONSE FORMAT\nSTATUS\nFINDINGS\nCHANGES\nFILES_TOUCHED\nTESTS_RUN\nRISKS\nRECOMMENDATION",
+          "--output-format",
+          "json",
+          "--dangerously-skip-permissions"
+        ],
+        "cwd": "F:\\ATEAM-NEXT\\ateam-next",
+        "exit_code": 0,
+        "elapsed_seconds": 265.625,
+        "stdout": null,
+        "stderr": "",
+        "timed_out": false,
+        "error": null
+      }
+    },
+    {
+      "task_id": "claude-adapter-implementation",
+      "agent": "claude",
+      "role": "Claude Code provider adapter implementer",
+      "cwd": "F:\\ATEAM-NEXT\\ateam-next",
+      "full_permission": true,
+      "started_at": "2026-08-30T10:04:45Z",
+      "result": {
+        "command": [
+          "C:\\Users\\karti\\AppData\\Roaming\\npm\\claude.CMD",
+          "-p",
+          "ROLE\nYou are implementing the Claude provider adapter for Ateam Next.\n\nOBJECTIVE\nCreate a production-oriented Claude adapter implementation with parser fixtures and tests, limited strictly to the Claude provider directory.\n\nREPOSITORY/CWD\nF:\\ATEAM-NEXT\\ateam-next\n\nRELEVANT FILES\nsrc/domain/events.ts\nsrc/domain/types.ts\nsrc/process/runner.ts\nsrc/providers/codex/adapter.ts\nsrc/providers/codex/parser.ts\nsrc/providers/codex/parser.test.ts\nsrc/providers/codex/fixtures/*\npackage.json\n\nOWNERSHIP BOUNDARIES\nYou may create/edit only files under src/providers/claude/. Do not edit index.ts, cli.tsx, docs, package files, runtime, scheduler, process runner, or other provider directories. Do not commit. Do not push.\n\nIMPLEMENTATION REQUIREMENTS\nImplement ClaudeAdapter with id 'claude'. Use explicit executable plus argv only. Prefer Claude's structured noninteractive JSON path: claude -p <prompt> --output-format json --no-session-persistence. Probe auth with claude auth status --json where possible, and version with --version if useful. Implement runOnce(message): Promise<AteamEvent[]> even if this is not yet in the shared interface. Normalize completion text into AgentStreamDelta plus READY. Normalize auth failures to AgentAvailabilityChanged AUTH_ERROR, rate limit-looking output to RateLimited, malformed JSON to RuntimeError. Parser should tolerate unknown fields.\n\nTESTING EXPECTED\nAdd tests under src/providers/claude using synthetic fixtures. Run targeted tests if possible.\n\nREQUESTED RESPONSE FORMAT\nSTATUS\nFINDINGS\nCHANGES\nFILES_TOUCHED\nTESTS_RUN\nRISKS\nRECOMMENDATION",
+          "--output-format",
+          "json",
+          "--no-session-persistence",
+          "--permission-mode",
+          "bypassPermissions"
+        ],
+        "cwd": "F:\\ATEAM-NEXT\\ateam-next",
+        "exit_code": 0,
+        "elapsed_seconds": 8.375,
+        "stdout": "Your message seems to have been cut off â€” it just says \"ROLE\" with no further content. Could you paste the full message again?\n",
+        "stderr": "",
+        "timed_out": false,
+        "error": null
+      }
+    },
+    {
+      "task_id": "grok-adapter-implementation",
+      "agent": "grok",
+      "role": "Grok provider adapter implementer",
+      "cwd": "F:\\ATEAM-NEXT\\ateam-next",
+      "full_permission": true,
+      "started_at": "2026-08-30T10:04:45Z",
+      "result": {
+        "command": [
+          "C:\\Users\\karti\\.grok\\bin\\grok.EXE",
+          "-p",
+          "ROLE\nYou are implementing the Grok provider adapter for Ateam Next.\n\nOBJECTIVE\nCreate a production-oriented Grok adapter implementation with parser fixtures and tests, limited strictly to the Grok provider directory.\n\nREPOSITORY/CWD\nF:\\ATEAM-NEXT\\ateam-next\n\nRELEVANT FILES\nsrc/domain/events.ts\nsrc/domain/types.ts\nsrc/process/runner.ts\nsrc/providers/codex/adapter.ts\nsrc/providers/codex/parser.ts\nsrc/providers/codex/parser.test.ts\npackage.json\n\nOWNERSHIP BOUNDARIES\nYou may create/edit only files under src/providers/grok/. Do not edit index.ts, cli.tsx, docs, package files, runtime, scheduler, process runner, or other provider directories. Do not commit. Do not push.\n\nIMPLEMENTATION REQUIREMENTS\nImplement GrokAdapter with id 'grok'. Use explicit executable plus argv only. Prefer structured noninteractive JSON path: grok -p <prompt> --cwd <cwd> --output-format json. Probe with grok inspect/models or --version; do not fabricate auth/quota. Implement runOnce(message): Promise<AteamEvent[]> even if this is not yet in the shared interface. Normalize completion text into AgentStreamDelta plus READY. Normalize auth failures to AUTH_ERROR, rate limit-looking output to RateLimited, malformed JSON to RuntimeError. Parser should tolerate unknown fields.\n\nTESTING EXPECTED\nAdd tests under src/providers/grok using synthetic fixtures. Run targeted tests if possible.\n\nREQUESTED RESPONSE FORMAT\nSTATUS\nFINDINGS\nCHANGES\nFILES_TOUCHED\nTESTS_RUN\nRISKS\nRECOMMENDATION",
+          "--cwd",
+          "F:\\ATEAM-NEXT\\ateam-next",
+          "--output-format",
+          "json",
+          "--permission-mode",
+          "bypassPermissions"
+        ],
+        "cwd": "F:\\ATEAM-NEXT\\ateam-next",
+        "exit_code": null,
+        "elapsed_seconds": 600.2030000000086,
+        "stdout": "",
+        "stderr": "",
+        "timed_out": true,
+        "error": "timeout after 600s"
+      }
+    }
+  ]
+}

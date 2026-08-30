@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
 import type {AteamEvent} from '../../domain/events.js';
 import type {ProcessResult} from '../../process/runner.js';
-import {AgyAdapter, normalizeAgyProbe, type AgyProcessIo} from './adapter.js';
+import {AgyAdapter, agyRunOnceArgs, normalizeAgyProbe, type AgyProcessIo} from './adapter.js';
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
@@ -90,6 +90,16 @@ describe('normalizeAgyProbe — version extraction edge cases', () => {
   });
 });
 
+describe('agyRunOnceArgs', () => {
+  it('uses explicit argv for the structured JSON path', () => {
+    expect(agyRunOnceArgs('hello')).toEqual(['-p', 'hello', '--output-format', 'json']);
+  });
+
+  it('does not invent an image flag when attachments are provided', () => {
+    expect(agyRunOnceArgs('hello', ['/abs/shot.png'])).toEqual(['-p', 'hello', '--output-format', 'json']);
+  });
+});
+
 describe('AgyAdapter', () => {
   it('has id agy', () => {
     expect(new AgyAdapter().id).toBe('agy');
@@ -113,6 +123,20 @@ describe('AgyAdapter', () => {
       delta: 'Hello, world! How can I help you today?',
     }));
     expect(events.at(-1)).toMatchObject({type: 'AgentAvailabilityChanged', availability: 'READY'});
+  });
+
+  it('runOnce accepts images and leaves argv unchanged when the CLI has no attachment flag', async () => {
+    let seen: string[] | undefined;
+    const stdout = readFileSync(join(fixtures, 'completion.json'), 'utf8');
+    const adapter = new AgyAdapter('agy', '/work', io({
+      stream: async spec => {
+        seen = spec.args;
+        return result({stdout, args: spec.args});
+      },
+    }));
+
+    await adapter.runOnce('hello', ['/abs/shot.png']);
+    expect(seen).toEqual(['-p', 'hello', '--output-format', 'json']);
   });
 
   it('runOnce maps timeouts and aborts to RuntimeError', async () => {

@@ -72,6 +72,53 @@ describe('CodexAdapter', () => {
     expect(events.some(event => event.type === 'ToolStarted')).toBe(true);
     expect(events.at(-1)).toMatchObject({type: 'AgentAvailabilityChanged', availability: 'READY'});
   });
+
+  it('keeps process args unchanged when images are omitted', async () => {
+    streamProcessMock.mockImplementation(async () => processResult(''));
+
+    await new CodexAdapter('codex', 'F:\\repo').runStreaming('task', () => undefined, new AbortController().signal);
+
+    expect(streamProcessMock.mock.calls[0]?.[0].args).toEqual([
+      'exec',
+      '--cd',
+      'F:\\repo',
+      '--skip-git-repo-check',
+      '--json',
+      '-',
+    ]);
+  });
+
+  it('passes image attachments through to codex exec', async () => {
+    streamProcessMock.mockImplementation(async () => processResult(''));
+
+    await new CodexAdapter('codex', 'F:\\repo').runStreaming(
+      'task',
+      () => undefined,
+      new AbortController().signal,
+      ['F:\\images\\one.png', 'F:\\images\\two.jpg'],
+    );
+
+    expect(streamProcessMock.mock.calls[0]?.[0].args).toEqual([
+      'exec',
+      '--cd',
+      'F:\\repo',
+      '--skip-git-repo-check',
+      '--json',
+      '-i',
+      'F:\\images\\one.png',
+      '-i',
+      'F:\\images\\two.jpg',
+      '-',
+    ]);
+  });
+
+  it('forwards runOnce image attachments to runStreaming', async () => {
+    streamProcessMock.mockImplementation(async () => processResult(''));
+
+    await new CodexAdapter('codex', 'F:\\repo').runOnce('task', ['F:\\images\\one.png']);
+
+    expect(streamProcessMock.mock.calls[0]?.[0].args).toContain('F:\\images\\one.png');
+  });
 });
 
 describe('normalizeCodexDoctor', () => {

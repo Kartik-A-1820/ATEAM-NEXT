@@ -27,7 +27,7 @@ describe('input editor', () => {
     state = applyEdit(state, 'newline');
     state = insertText(state, 'line two');
     const result = submit(state);
-    expect(result.submitted).toBe('line one\nline two');
+    expect(result.submitted).toEqual({text: 'line one\nline two', images: []});
     const recalled = applyEdit(result.state, 'historyPrev');
     expect(recalled.value).toBe('line one\nline two');
   });
@@ -40,7 +40,7 @@ describe('input editor', () => {
     expect(state.value.length).toBeLessThan(50);
 
     const result = submit(state);
-    expect(result.submitted).toBe(paste);
+    expect(result.submitted).toEqual({text: paste, images: []});
   });
 
   it('keeps a short paste inline, uncompacted', () => {
@@ -64,14 +64,14 @@ describe('input editor', () => {
     expect(state.value).toBe('before  after');
 
     const result = submit(state);
-    expect(result.submitted).toBe('before  after');
+    expect(result.submitted).toEqual({text: 'before  after', images: []});
   });
 
-  it('inserts and expands an image reference placeholder', () => {
+  it('inserts and expands an image reference placeholder, and surfaces the path in submitted.images', () => {
     const state = insertImagePlaceholder(createInputEditor(), '/tmp/screenshot.png');
     expect(state.value).toBe('[image attached #1: screenshot.png]');
     const result = submit(state);
-    expect(result.submitted).toBe('(attached image: /tmp/screenshot.png)');
+    expect(result.submitted).toEqual({text: '(attached image: /tmp/screenshot.png)', images: ['/tmp/screenshot.png']});
   });
 
   it('auto-detects a pasted path to an existing image file', () => {
@@ -82,7 +82,23 @@ describe('input editor', () => {
     const state = insertText(createInputEditor(), path);
     expect(state.value).toBe(`[image attached #1: ${path.split(/[\\/]/).pop()}]`);
     const result = submit(state);
-    expect(result.submitted).toBe(`(attached image: ${path})`);
+    expect(result.submitted).toEqual({text: `(attached image: ${path})`, images: [path]});
+  });
+
+  it('drops an image from submitted.images if its placeholder was deleted before submit', () => {
+    let state = insertImagePlaceholder(createInputEditor(), '/tmp/screenshot.png');
+    state = applyEdit(state, 'backspace');
+    expect(state.value).toBe('');
+    const result = submit(state);
+    expect(result.submitted).toBeUndefined();
+  });
+
+  it('collects multiple attached images in order', () => {
+    let state = insertImagePlaceholder(createInputEditor(), '/tmp/a.png');
+    state = insertText(state, ' and ');
+    state = insertImagePlaceholder(state, '/tmp/b.png');
+    const result = submit(state);
+    expect(result.submitted?.images).toEqual(['/tmp/a.png', '/tmp/b.png']);
   });
 
   it('does not treat a nonexistent image-like path as an attachment', () => {

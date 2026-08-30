@@ -1,9 +1,11 @@
 import Database from 'better-sqlite3';
+import {createHash} from 'node:crypto';
 import {mkdirSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {homedir} from 'node:os';
 import type {AteamEvent} from '../domain/events.js';
 import {eventSchema} from '../domain/events.js';
+import type {CodeSymbol, FileOutline} from '../knowledge/indexer.js';
 
 export interface StoredSession {
   id: string;
@@ -172,6 +174,65 @@ export class AteamStore {
     return rows.map(memoryFromRow);
   }
 
+  saveGraphOutlines(outlines: FileOutline[]): void {
+    const tx = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM knowledge_graph_symbols').run();
+      this.db.prepare('DELETE FROM knowledge_graph_files').run();
+      const indexedAt = Date.now();
+      const insertFile = this.db.prepare(`
+        INSERT INTO knowledge_graph_files (path, content_hash, language, last_indexed_at)
+        VALUES (?, ?, ?, ?)
+      `);
+      const insertSymbol = this.db.prepare(`
+        INSERT INTO knowledge_graph_symbols (file, name, kind, signature, start_line, end_line, exported)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const outline of outlines) {
+        insertFile.run(outline.path, contentHashForOutline(outline), outline.language, indexedAt);
+        for (const symbol of outline.symbols) {
+          insertSymbol.run(
+            symbol.file,
+            symbol.name,
+            symbol.kind,
+            symbol.signature,
+            symbol.startLine,
+            symbol.endLine,
+            symbol.exported ? 1 : 0,
+          );
+        }
+      }
+    });
+    tx();
+  }
+
+  loadGraphOutlines(): FileOutline[] {
+    const fileRows = this.db.prepare(`
+      SELECT path, language
+      FROM knowledge_graph_files
+      ORDER BY path ASC
+    `).all() as Array<{path: string; language: string}>;
+    const symbolRows = this.db.prepare(`
+      SELECT file, name, kind, signature, start_line as startLine, end_line as endLine, exported
+      FROM knowledge_graph_symbols
+      ORDER BY file ASC, start_line ASC, id ASC
+    `).all() as Array<Record<string, unknown>>;
+
+    const symbolsByFile = new Map<string, CodeSymbol[]>();
+    for (const row of symbolRows) {
+      const symbol = symbolFromGraphRow(row);
+      const symbols = symbolsByFile.get(symbol.file) ?? [];
+      symbols.push(symbol);
+      symbolsByFile.set(symbol.file, symbols);
+    }
+
+    return fileRows.map(row => ({
+      path: row.path,
+      language: row.language,
+      symbols: symbolsByFile.get(row.path) ?? [],
+    }));
+  }
+
   private migrate(): void {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -242,6 +303,31 @@ export class AteamStore {
         CREATE INDEX IF NOT EXISTS tasks_session_id_idx ON tasks(session_id, id);
       `);
       this.db.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (2, ?)').run(Date.now());
+    }
+    if (!applied.has(3)) {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS knowledge_graph_files (
+          path TEXT PRIMARY KEY,
+          content_hash TEXT NOT NULL,
+          language TEXT NOT NULL,
+          last_indexed_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS knowledge_graph_symbols (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          file TEXT NOT NULL REFERENCES knowledge_graph_files(path) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          signature TEXT NOT NULL,
+          start_line INTEGER NOT NULL,
+          end_line INTEGER NOT NULL,
+          exported INTEGER NOT NULL CHECK(exported IN (0, 1))
+        );
+
+        CREATE INDEX IF NOT EXISTS knowledge_graph_symbols_file_idx ON knowledge_graph_symbols(file, start_line);
+        CREATE INDEX IF NOT EXISTS knowledge_graph_symbols_name_idx ON knowledge_graph_symbols(name);
+      `);
+      this.db.prepare('INSERT INTO schema_migrations (version, applied_at) VALUES (3, ?)').run(Date.now());
     }
   }
 
@@ -349,4 +435,22 @@ function memoryFromRow(row: Record<string, unknown>): StoredMemory {
     confidence: typeof row.confidence === 'number' ? row.confidence : undefined,
     createdAt: Number(row.createdAt),
   };
+}
+
+function symbolFromGraphRow(row: Record<string, unknown>): CodeSymbol {
+  return {
+    file: String(row.file),
+    name: String(row.name),
+    kind: String(row.kind),
+    signature: String(row.signature),
+    startLine: Number(row.startLine),
+    endLine: Number(row.endLine),
+    exported: Boolean(Number(row.exported)),
+  };
+}
+
+function contentHashForOutline(outline: FileOutline): string {
+  return createHash('sha256')
+    .update(JSON.stringify({path: outline.path, language: outline.language, symbols: outline.symbols}))
+    .digest('hex');
 }

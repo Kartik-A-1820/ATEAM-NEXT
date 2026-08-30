@@ -222,6 +222,9 @@ export function reduce(state: AppState, event: AteamEvent): AppState {
     case 'AteamReplied':
       next.conversation.push(entry('Ateam', event.text, 'QUIET'));
       return next;
+    case 'ContextPacketCompiled':
+      next.conversation.push(entry('System', `Context packet for ${event.taskId} (${event.agentId}):\n${event.packet}`, 'TRACE', event.taskId));
+      return next;
     default:
       return next;
   }

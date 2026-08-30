@@ -3,6 +3,8 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {describe, expect, it} from 'vitest';
 import {AteamStore} from './store.js';
+import {buildGraphStore} from '../knowledge/graph.js';
+import type {FileOutline} from '../knowledge/indexer.js';
 
 describe('AteamStore', () => {
   it('creates sessions and persists canonical events', () => {
@@ -47,6 +49,42 @@ describe('AteamStore', () => {
       verificationState: 'VERIFIED',
       evidence: ['user instruction'],
     });
+    store.close();
+  });
+
+  it('persists and loads knowledge graph outlines', () => {
+    const store = new AteamStore(join(mkdtempSync(join(tmpdir(), 'ateam-store-')), 'test.sqlite'));
+    const outlines: FileOutline[] = [
+      {
+        path: 'src/example.ts',
+        language: 'typescript',
+        symbols: [
+          {
+            file: 'src/example.ts',
+            name: 'example',
+            kind: 'function',
+            signature: 'export function example(): void { ... }',
+            startLine: 3,
+            endLine: 5,
+            exported: true,
+          },
+        ],
+      },
+      {
+        path: 'src/empty.ts',
+        language: 'typescript',
+        symbols: [],
+      },
+    ];
+
+    store.saveGraphOutlines(outlines);
+
+    const loaded = store.loadGraphOutlines();
+    const graph = buildGraphStore(loaded);
+
+    expect(loaded).toEqual([outlines[1], outlines[0]]);
+    expect(graph.stats()).toEqual({fileCount: 2, symbolCount: 1});
+    expect(graph.allSymbols()).toEqual(outlines[0]?.symbols);
     store.close();
   });
 });

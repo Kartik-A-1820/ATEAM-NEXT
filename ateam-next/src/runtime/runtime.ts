@@ -7,10 +7,13 @@ import {MemoryStore} from '../memory/memory.js';
 import type {AgentAvailability, AgentId, AgentState, PermissionMode, PipelinePhase, Verbosity} from '../domain/types.js';
 import {createDefaultProviders, type ProviderMap} from '../providers/registry.js';
 import {compileContextPacket} from '../context/compiler.js';
-import {buildGraphStore, type CodeGraphStore} from '../knowledge/graph.js';
+import {buildGraphStore, loadPersistedGraphStore, savePersistedGraphStore, type CodeGraphStore} from '../knowledge/graph.js';
 import {indexDirectory} from '../knowledge/indexer.js';
 import {queryRelevantContextSafe} from '../knowledge/query.js';
 import {formatDoctor, runDoctor} from '../doctor/doctor.js';
+import type {AteamStore} from '../storage/store.js';
+
+type KnowledgeStore = Pick<AteamStore, 'loadGraphOutlines' | 'saveGraphOutlines'>;
 import {
   type AgentHealth,
   type CooldownKind,
@@ -19,6 +22,7 @@ import {
   looksLikeUsageLimit,
   parseResetHint,
   PERSISTENT_FAILURE_THRESHOLD,
+  recordRunOutcome,
   recordSuccess,
   recordTransientFailure,
 } from '../domain/agentHealth.js';
@@ -57,7 +61,10 @@ export class RuntimeController {
   private readonly taskResults = new Map<string, string>();
   private readonly health: Partial<Record<AgentId, AgentHealth>>;
   private knowledgeGraph?: CodeGraphStore;
+  private knowledgeGraphFreshlyIndexed = false;
   private knowledgeGraphIndexing?: Promise<void>;
+  private readonly knowledgeStore?: KnowledgeStore;
+  private currentImages?: string[];
 
   constructor(
     private readonly send: (event: AteamEvent) => void,
@@ -67,12 +74,21 @@ export class RuntimeController {
     /** Health reconstructed from a replayed session (see storage/session.ts), so a
      * resumed session knows which agents were mid-cooldown instead of assuming READY. */
     initialHealth?: Partial<Record<AgentId, AgentHealth>>,
+    /** Same AteamStore the session persists to — reused to persist/reload the
+     * knowledge graph too, so a repeat session doesn't re-scan from scratch. */
+    knowledgeStore?: KnowledgeStore,
   ) {
     if (simulate) {
       this.simulator = new Simulator(send);
     }
     this.providers = providers ?? (simulate ? {} : createDefaultProviders());
     this.health = initialHealth ?? {};
+    this.knowledgeStore = knowledgeStore;
+    if (!simulate) {
+      // Fail-open and synchronous (SQLite reads, no network): gives the very first
+      // task prompt *something* to work with while a fresh background reindex runs.
+      this.knowledgeGraph = loadPersistedGraphStore(knowledgeStore);
+    }
   }
 
   handle(command: RuntimeCommand): void {
@@ -116,6 +132,7 @@ export class RuntimeController {
             return;
           }
         }
+        this.currentImages = command.images && command.images.length > 0 ? command.images : undefined;
         if (this.simulator) {
           this.active = true;
           this.planAndSchedule(command.message, at);
@@ -454,12 +471,13 @@ export class RuntimeController {
     this.send({type: 'AgentAvailabilityChanged', agentId: assignment.agentId, availability: 'BUSY', at});
     this.send({type: 'TaskStatusChanged', taskId, status: 'RUNNING', at});
     const controller = new AbortController();
+    const startedAt = Date.now();
     try {
       let transientReason: string | undefined;
       let terminalReason: string | undefined;
       const chunks: string[] = [];
       await provider.runStreaming(
-        await this.renderProviderTaskPrompt(objective, task),
+        await this.renderProviderTaskPrompt(objective, task, assignment.agentId, taskId),
         event => {
           const normalized = eventWithTask(event, assignment.agentId, taskId);
           if (normalized.type === 'RateLimited') {
@@ -484,13 +502,16 @@ export class RuntimeController {
           this.send(normalized);
         },
         controller.signal,
+        this.currentImages,
       );
       if (!transientReason && !terminalReason) {
         this.recordAgentSuccess(assignment.agentId);
+        this.recordRunOutcome(assignment.agentId, {success: true, durationMs: Date.now() - startedAt});
         this.taskResults.set(task.id, chunks.join('') || `${task.id} completed`);
         this.send({type: 'TaskStatusChanged', taskId, status: 'COMPLETED', at: Date.now()});
         return {kind: 'success'};
       }
+      this.recordRunOutcome(assignment.agentId, {success: false, durationMs: Date.now() - startedAt});
       if (transientReason) {
         return {kind: 'transient', reason: transientReason};
       }
@@ -498,6 +519,7 @@ export class RuntimeController {
       this.send({type: 'TaskStatusChanged', taskId, status: 'FAILED', at: Date.now()});
       return {kind: 'terminal', reason: terminalReason ?? 'unknown failure'};
     } catch (error) {
+      this.recordRunOutcome(assignment.agentId, {success: false, durationMs: Date.now() - startedAt});
       const rawMessage = error instanceof Error ? error.message : String(error);
       const message = `${assignment.agentId} crashed while running ${taskId}: ${rawMessage}`;
       this.applyCooldown(assignment.agentId, {reason: message, kind: 'UNHEALTHY'});
@@ -544,6 +566,11 @@ export class RuntimeController {
       ? `${headline} — failed ${updated.consecutiveFailures} times in a row; check /doctor if this keeps happening`
       : headline;
     this.send({type: 'AgentCooldownChanged', agentId, cooldownUntil: updated.cooldownUntil, reason, at: now});
+  }
+
+  private recordRunOutcome(agentId: AgentId, options: {success: boolean; durationMs: number}): void {
+    const current = this.health[agentId] ?? createAgentHealth(agentId);
+    this.health[agentId] = recordRunOutcome(current, options);
   }
 
   private recordAgentSuccess(agentId: AgentId): void {
@@ -610,12 +637,21 @@ export class RuntimeController {
   }
 
   private usageSummary(): string {
+    const observed = (Object.keys(this.health) as AgentId[])
+      .map(agentId => ({agentId, health: this.health[agentId]}))
+      .filter((entry): entry is {agentId: AgentId; health: AgentHealth} => (entry.health?.totalRuns ?? 0) > 0)
+      .map(({agentId, health}) => {
+        const successRate = Math.round((100 * (health.totalSuccesses ?? 0)) / (health.totalRuns ?? 1));
+        const latency = health.rollingLatencyMs !== undefined ? `${(health.rollingLatencyMs / 1000).toFixed(1)}s avg` : 'latency unknown';
+        return `${agentId}: ${health.totalRuns} run${health.totalRuns === 1 ? '' : 's'}, ${successRate}% succeeded, ${latency}`;
+      });
     return [
       'Usage',
       'Ateam does not invent remaining-quota numbers. Provider CLIs do not expose a reliable quota field.',
       'Availability is tracked from probes and live AgentAvailabilityChanged events.',
       `Configured providers: ${Object.keys(this.providers).join(', ') || (this.simulate ? 'simulated grok,codex,claude,agy' : 'none')}`,
       `Current pipeline phase: ${this.pipelinePhase}`,
+      observed.length > 0 ? `Observed this session:\n${observed.join('\n')}` : 'No real task runs observed yet this session.',
     ].join('\n');
   }
 
@@ -626,13 +662,14 @@ export class RuntimeController {
   }
 
   private graphSummary(): string {
-    if (!this.knowledgeGraph) return 'Knowledge graph is not indexed yet.';
-    const stats = this.knowledgeGraph.stats();
-    return `Knowledge graph indexed: ${stats.fileCount} files, ${stats.symbolCount} symbols.`;
+    const stats = this.knowledgeGraph?.stats();
+    if (!stats || stats.fileCount === 0) return 'Knowledge graph is not indexed yet.';
+    const freshness = this.knowledgeGraphFreshlyIndexed ? 'indexed this session' : 'loaded from a previous session — reindexing in the background';
+    return `Knowledge graph ${freshness}: ${stats.fileCount} files, ${stats.symbolCount} symbols.`;
   }
 
   private ensureKnowledgeGraphIndexing(): void {
-    if (this.simulate || this.knowledgeGraph || this.knowledgeGraphIndexing) return;
+    if (this.simulate || this.knowledgeGraphFreshlyIndexed || this.knowledgeGraphIndexing) return;
     void this.reindexKnowledgeGraph({manual: false});
   }
 
@@ -643,6 +680,8 @@ export class RuntimeController {
       .then(outlines => {
         const store = buildGraphStore(outlines);
         this.knowledgeGraph = store;
+        this.knowledgeGraphFreshlyIndexed = true;
+        savePersistedGraphStore(this.knowledgeStore, store);
         const stats = store.stats();
         const at = Date.now();
         this.send({type: 'KnowledgeGraphIndexed', fileCount: stats.fileCount, symbolCount: stats.symbolCount, durationMs: at - started, at});
@@ -662,9 +701,15 @@ export class RuntimeController {
     await run;
   }
 
-  private async renderProviderTaskPrompt(objective: string, task: PlannedTask): Promise<string> {
+  private async renderProviderTaskPrompt(objective: string, task: PlannedTask, agentId: AgentId, taskId: string): Promise<string> {
     const context = await queryRelevantContextSafe(this.knowledgeGraph, objective);
-    return renderProviderTaskPrompt(objective, task, this.currentGraph, this.memories, this.permissionMode, this.taskResults, context);
+    const prompt = renderProviderTaskPrompt(objective, task, this.currentGraph, this.memories, this.permissionMode, this.taskResults, context);
+    // Gated at the source, not just at display: a compiled prompt can be sizeable,
+    // and this is meant as an opt-in debugging aid, not something logged every run.
+    if (this.verbosity === 'TRACE') {
+      this.send({type: 'ContextPacketCompiled', taskId, agentId, packet: prompt, at: Date.now()});
+    }
+    return prompt;
   }
 }
 

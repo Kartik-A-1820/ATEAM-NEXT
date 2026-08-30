@@ -1,4 +1,4 @@
-import type {AgentId, AppState, ConversationEntry, TaskNode} from '../domain/types.js';
+import type {AgentId, AgentState, AppState, ConversationEntry, TaskNode} from '../domain/types.js';
 
 export const statusSymbol: Record<string, string> = {
   READY: '*',
@@ -94,8 +94,47 @@ export function speakerColor(speaker: ConversationEntry['speaker'], agents: AppS
   return 'white';
 }
 
-export function agentTaskSuffix(agent: {runningTaskCount: number}): string {
-  return agent.runningTaskCount > 0 ? ` ×${agent.runningTaskCount}` : '';
+export type AgentBadgeFields = Pick<AgentState, 'availability' | 'runningTaskCount' | 'currentTaskObjective' | 'cooldownUntil'>;
+
+const OBJECTIVE_SNIPPET_MAX = 18;
+
+/** Compact status text after an agent display name on the header/status line. */
+export function formatAgentBadgeStatus(agent: AgentBadgeFields, now = Date.now()): string {
+  if (agent.runningTaskCount > 0 || agent.currentTaskObjective) {
+    const count = agent.runningTaskCount > 0 ? ` ×${agent.runningTaskCount}` : '';
+    const snippet = agent.currentTaskObjective ? ` ${truncateSnippet(agent.currentTaskObjective)}` : '';
+    return `${agent.availability}${count}${snippet}`;
+  }
+
+  const countdown = formatCooldownCountdown(agent.cooldownUntil, now);
+  if (countdown) {
+    const compact = countdown.endsWith(' left') ? countdown.slice(0, -' left'.length) : countdown;
+    return `cooling ${compact}`;
+  }
+
+  return agent.availability;
+}
+
+export function formatAgentGlance(
+  agent: AgentBadgeFields & Pick<AgentState, 'displayName'>,
+  now = Date.now(),
+): string | undefined {
+  const status = formatAgentBadgeStatus(agent, now);
+  if (status === agent.availability) return undefined;
+  return `${agent.displayName} ${status}`;
+}
+
+export function agentTaskSuffix(agent: AgentBadgeFields, now = Date.now()): string {
+  const status = formatAgentBadgeStatus(agent, now);
+  if (status === agent.availability) return '';
+  if (status.startsWith(agent.availability)) return status.slice(agent.availability.length);
+  return ` ${status}`;
+}
+
+function truncateSnippet(text: string, max = OBJECTIVE_SNIPPET_MAX): string {
+  const collapsed = text.replace(/\s+/g, ' ').trim();
+  if (collapsed.length <= max) return collapsed;
+  return `${collapsed.slice(0, Math.max(1, max - 3))}...`;
 }
 
 /** Formats a future cooldown timestamp as a short countdown, e.g. "4m 12s left" — or undefined once it's passed. */

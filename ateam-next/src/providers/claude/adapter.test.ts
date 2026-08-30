@@ -72,4 +72,51 @@ describe('ClaudeAdapter', () => {
     expect(events.some(event => event.type === 'ToolStarted')).toBe(true);
     expect(events.some(event => event.type === 'ToolFinished')).toBe(true);
   });
+
+  it('keeps process args unchanged when images are omitted', async () => {
+    streamProcessMock.mockImplementation(async () => processResult(''));
+
+    await new ClaudeAdapter('claude', 'F:\\repo').runStreaming('task', () => undefined, new AbortController().signal);
+
+    expect(streamProcessMock.mock.calls[0]?.[0].args).toEqual([
+      '-p',
+      'task',
+      '--output-format',
+      'json',
+      '--no-session-persistence',
+    ]);
+  });
+
+  it('does not invent image args for claude print mode', async () => {
+    streamProcessMock.mockImplementation(async () => processResult(''));
+
+    await new ClaudeAdapter('claude', 'F:\\repo').runStreaming(
+      'task',
+      () => undefined,
+      new AbortController().signal,
+      ['F:\\images\\one.png', 'F:\\images\\two.jpg'],
+    );
+
+    expect(streamProcessMock.mock.calls[0]?.[0].args).toEqual([
+      '-p',
+      'task',
+      '--output-format',
+      'json',
+      '--no-session-persistence',
+    ]);
+  });
+
+  it('keeps runOnce as a thin wrapper when images are provided', async () => {
+    streamProcessMock.mockImplementation(async () => processResult(''));
+
+    await new ClaudeAdapter('claude', 'F:\\repo').runOnce('task', ['F:\\images\\one.png']);
+
+    expect(streamProcessMock.mock.calls[0]?.[0].args).toEqual([
+      '-p',
+      'task',
+      '--output-format',
+      'json',
+      '--no-session-persistence',
+    ]);
+  });
 });
