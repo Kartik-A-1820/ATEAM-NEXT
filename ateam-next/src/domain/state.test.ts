@@ -5,10 +5,11 @@ describe('state reducer', () => {
   it('updates canonical state from events', () => {
     let state = initialState();
     state = reduce(state, {type: 'UserMessageReceived', message: 'Refactor auth', at: 1});
-    state = reduce(state, {type: 'AgentAvailabilityChanged', agentId: 'claude', availability: 'BUSY', at: 2});
+    state = reduce(state, {type: 'AgentAvailabilityChanged', agentId: 'claude', availability: 'BUSY', version: '2.1.226', at: 2});
     state = reduce(state, {type: 'TaskCreated', taskId: 'T1', objective: 'review auth', assignedAgent: 'claude', at: 3});
     state = reduce(state, {type: 'TaskStatusChanged', taskId: 'T1', status: 'RUNNING', at: 4});
     expect(state.agents.claude.availability).toBe('BUSY');
+    expect(state.agents.claude.version).toBe('2.1.226');
     expect(state.tasks.T1.status).toBe('RUNNING');
     expect(visibleEntries(state).some(entry => entry.text === 'Refactor auth')).toBe(true);
   });

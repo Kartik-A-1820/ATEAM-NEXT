@@ -24,7 +24,7 @@ export const eventSchema = z.discriminatedUnion('type', [
   z.object({type: z.literal('TerminalResized'), width: z.number(), height: z.number(), at: z.number()}),
   z.object({type: z.literal('UserMessageReceived'), message: z.string(), at: z.number()}),
   z.object({type: z.literal('UserMessageClassified'), classification: z.string(), at: z.number()}),
-  z.object({type: z.literal('AgentAvailabilityChanged'), agentId, availability, reason: z.string().optional(), at: z.number()}),
+  z.object({type: z.literal('AgentAvailabilityChanged'), agentId, availability, reason: z.string().optional(), version: z.string().optional(), at: z.number()}),
   z.object({type: z.literal('AgentStreamDelta'), agentId, taskId: z.string().optional(), delta: z.string(), at: z.number()}),
   z.object({type: z.literal('ThinkingSummary'), agentId, summary: z.string(), at: z.number()}),
   z.object({type: z.literal('ToolStarted'), agentId, tool: z.string(), at: z.number()}),

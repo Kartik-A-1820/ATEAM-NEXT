@@ -43,6 +43,8 @@ The initial registry tracks stable identities:
 
 Every visual state pairs color with text and symbols such as `READY`, `BUSY`, `RATE_LIMITED`, or `AUTH_ERROR`.
 
+In real interactive mode, startup probes update the registry through canonical `AgentAvailabilityChanged` events. Codex uses structured `codex doctor --json` normalization; other providers currently use cheap version probes until their full adapters exist. Simulation mode does not run provider probes so UI tests and demos stay deterministic.
+
 ## Simulation First
 
 `ateam dev --simulate` drives the TUI through a deterministic fake provider layer. Scenarios include streaming, tool-heavy runs, permission requests, rate limits, auth failure, and crashes.

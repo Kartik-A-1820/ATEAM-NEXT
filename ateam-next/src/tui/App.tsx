@@ -9,6 +9,7 @@ import type {AteamEvent, RuntimeCommand} from '../domain/events.js';
 import {commandHelp, parseInput} from '../commands/registry.js';
 import {InputBox} from './InputBox.js';
 import type {AteamStore, StoredSession} from '../storage/store.js';
+import {probeLocalAgents} from '../agents/probe.js';
 
 interface Props {
   simulate: boolean;
@@ -16,6 +17,7 @@ interface Props {
   store?: AteamStore;
   initial?: AppState;
   sessionMode?: 'new' | 'resume';
+  probeProviders?: boolean;
 }
 
 const statusSymbol: Record<string, string> = {
@@ -27,7 +29,7 @@ const statusSymbol: Record<string, string> = {
   UNHEALTHY: '!',
 };
 
-export function App({simulate, scenario, store, initial, sessionMode = 'new'}: Props) {
+export function App({simulate, scenario, store, initial, sessionMode = 'new', probeProviders = false}: Props) {
   const {exit} = useApp();
   const {columns, rows} = useWindowSize();
   const [state, setState] = useState(() => initial ?? initialState(columns, rows));
@@ -47,6 +49,20 @@ export function App({simulate, scenario, store, initial, sessionMode = 'new'}: P
   };
 
   const runtime = useMemo(() => new RuntimeController(send, simulate, scenario), [simulate, scenario]);
+
+  React.useEffect(() => {
+    if (!probeProviders) return undefined;
+    let cancelled = false;
+    void probeLocalAgents(process.cwd()).then(events => {
+      if (cancelled) return;
+      for (const event of events) {
+        send(event);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [probeProviders]);
 
   React.useEffect(() => {
     if (sessionMode === 'new') {
@@ -120,6 +136,7 @@ function MainPane({state, entries, height, width}: {state: ReturnType<typeof ini
         {Object.values(state.agents).map(agent => (
           <Text key={agent.id} color={agent.color}>
             {statusSymbol[agent.availability] ?? 'o'} {agent.displayName} {agent.availability} tasks={agent.runningTaskCount} auth={String(agent.authenticated)}
+            {agent.version ? ` version=${agent.version}` : ''}
             {agent.lastError ? ` error=${agent.lastError}` : ''}
           </Text>
         ))}

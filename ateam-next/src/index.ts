@@ -13,3 +13,4 @@ export {createInitialTaskGraph, readyTasks, applyConstraint} from './planner/tas
 export {scheduleTask} from './scheduler/scheduler.js';
 export {MemoryStore} from './memory/memory.js';
 export {compileContextPacket} from './context/compiler.js';
+export {probeLocalAgents, availabilityFromVersionProbe} from './agents/probe.js';

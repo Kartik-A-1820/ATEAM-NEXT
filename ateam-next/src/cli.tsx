@@ -19,7 +19,7 @@ program
   .version('0.1.0')
   .action(async () => {
     const store = new AteamStore();
-    const instance = render(<App simulate={false} scenario="STREAMING" store={store} />);
+    const instance = render(<App simulate={false} scenario="STREAMING" store={store} probeProviders={true} />);
     await instance.waitUntilExit();
     store.close();
   });

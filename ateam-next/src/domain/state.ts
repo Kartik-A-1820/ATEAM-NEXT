@@ -52,7 +52,7 @@ export function reduce(state: AppState, event: AteamEvent): AppState {
       return next;
     case 'AgentAvailabilityChanged': {
       const current = next.agents[event.agentId];
-      next.agents[event.agentId] = {...current, availability: event.availability, lastError: event.reason};
+      next.agents[event.agentId] = {...current, availability: event.availability, version: event.version ?? current.version, lastError: event.reason};
       return next;
     }
     case 'AgentStreamDelta': {

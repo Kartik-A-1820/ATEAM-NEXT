@@ -26,6 +26,7 @@ export interface AgentState {
   availability: AgentAvailability;
   installed: boolean;
   authenticated: boolean | 'UNKNOWN';
+  version?: string;
   runningTaskCount: number;
   lastError?: string;
 }
