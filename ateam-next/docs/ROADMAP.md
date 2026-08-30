@@ -17,6 +17,8 @@
 - SQLite persistence with migrations, session list, and event replay added.
 - Doctor command probes Git and all four provider executables.
 - Codex adapter parser fixtures and scaffold added.
+- Streaming process runner added for future provider adapters.
+- Permission policy, initial task graph, and deterministic scheduler skeletons added.
 - Unit tests for commands, reducer, input editor, runtime, simulator, process runner, headless mode, and TUI render/input.
 
 ## IN_PROGRESS
@@ -25,6 +27,8 @@
 - Manual terminal exercise across simulation scenarios.
 - Input hardening for large paste and advanced key combinations.
 - Milestone 2 core runtime boundaries.
+- Milestone 5 planner and mutable DAG foundation.
+- Milestone 6 deterministic scheduler foundation.
 - Milestone 4 persistence foundation.
 - Milestone 3 Codex adapter contract foundation.
 - Terminal teardown polish: PTY capture still shows a trailing border character after Ctrl+C even though the shell prompt returns.
@@ -32,8 +36,8 @@
 ## NEXT
 
 - Milestone 2 core runtime: lifecycle, error model, effect boundaries.
-- Milestone 5 planner and mutable DAG.
-- Milestone 6 deterministic scheduler.
+- Connect planner/scheduler to the live runtime.
+- Add context compiler and provenance-aware memory.
 - Add render throttling and scrollback windowing.
 - Expand process-control utilities with provider fixtures and abort-signal tests.
 - Expand simulation tests for rate limit, permission, crash, and cancellation.

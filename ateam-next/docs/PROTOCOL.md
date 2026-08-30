@@ -74,3 +74,7 @@ Provider sessions are projections or caches, not the source of truth.
 - `agent:<agentId>`
 
 The reducer cancels matching cancellable tasks and leaves completed work intact.
+
+## Permission Decisions
+
+Ateam owns provider-neutral permission decisions. The current policy supports `SAFE`, `STANDARD`, and `FULL` profiles over capabilities such as `read_project`, `write_project`, `shell`, `network`, `package_install`, `git_commit`, `git_push`, and `destructive_shell`. Explicit denials override profile defaults.

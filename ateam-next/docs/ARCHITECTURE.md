@@ -15,7 +15,10 @@ Ateam owns orchestration. Providers are workers behind adapters; no provider con
 - Provider adapters: interface defined in `src/domain/events.ts`; production implementations are future work.
 - Persistence: `src/storage`, using SQLite through `better-sqlite3` with migrations and event replay.
 - Provider adapters: `src/providers`, starting with Codex JSONL parser fixtures and probe/run scaffolding.
-- Planner, task graph, scheduler, permissions, memory, and context compiler: documented protocol boundaries now, implementation follows the core runtime slice.
+- Permissions: `src/permissions`, canonical SAFE/STANDARD/FULL capability decisions.
+- Planner/task graph: `src/planner`, deterministic task DAG skeleton with constraint invalidation.
+- Scheduler: `src/scheduler`, deterministic provider selection heuristics.
+- Memory and context compiler: documented protocol boundaries now, implementation follows the core runtime slice.
 
 ## Runtime Flow
 
@@ -53,10 +56,14 @@ Milestone 2 should keep business logic outside Ink components. The reducer, comm
 
 ## Process Control
 
-Provider adapters must use explicit executable paths plus argument arrays. Prompts and large payloads should go through stdin where provider CLIs support it. The initial process runner captures stdout/stderr separately, supports timeout and abort-driven cancellation, hides child windows on Windows, and uses `taskkill.exe /pid <pid> /t /f` for Windows process trees.
+Provider adapters must use explicit executable paths plus argument arrays. Prompts and large payloads should go through stdin where provider CLIs support it. The process runner captures stdout/stderr separately, supports timeout and abort-driven cancellation, hides child windows on Windows, supports streaming callbacks, and uses `taskkill.exe /pid <pid> /t /f` for Windows process trees.
 
 On Windows, command resolution prefers spawnable `.exe`, `.cmd`, and `.bat` entries from `where.exe`; this is required for CLIs such as Claude that install npm command shims.
 
 ## Persistence
 
 SQLite is authoritative for sessions and event replay. Current tables include `sessions`, `events`, `messages`, `tasks`, and `memories`. The current implementation persists canonical events for headless simulated runs and can list/resume sessions from the event log.
+
+## Planner And Scheduler
+
+The first planner is intentionally deterministic. It creates capability-oriented tasks rather than assigning provider names. The scheduler then picks providers from current agent state, task type, workload, and user restrictions. This preserves graceful degradation from four providers to one.

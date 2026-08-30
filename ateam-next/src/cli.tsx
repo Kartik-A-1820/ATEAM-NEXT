@@ -9,6 +9,7 @@ import {runHeadlessSimulation} from './runtime/headless.js';
 import {AteamStore} from './storage/store.js';
 import {formatSessionList, replaySession} from './storage/session.js';
 import {formatDoctor, runDoctor} from './doctor/doctor.js';
+import {CodexAdapter} from './providers/codex/adapter.js';
 
 const program = new Command();
 
@@ -38,13 +39,7 @@ program.command('run')
     const store = new AteamStore();
     const result = localOptions.simulate
       ? await runHeadlessSimulation(prompt, normalizeScenario(localOptions.scenario ?? 'STREAMING'), store)
-      : {
-          sessionId: `headless-${Date.now()}`,
-          prompt,
-          mode: 'provider',
-          status: 'not_configured',
-          message: 'Production providers are not wired yet; use --simulate or interactive dev mode.',
-        };
+      : await runCodexHeadless(prompt, store);
     if (localOptions.json) {
       process.stdout.write(`${JSON.stringify(result)}\n`);
     } else {
@@ -62,9 +57,10 @@ program.command('doctor')
     process.stdout.write(options.json ? `${JSON.stringify(report, null, 2)}\n` : formatDoctor(report));
   });
 
-program.command('agents').description('show agent status').option('--json', 'emit structured JSON').action((options: {json?: boolean}) => {
-  const agents = ['Codex READY', 'Claude READY', 'AGY READY', 'Grok READY'];
-  process.stdout.write(options.json ? `${JSON.stringify({agents})}\n` : `${agents.join('\n')}\n`);
+program.command('agents').description('show agent status').option('--json', 'emit structured JSON').action(async (options: {json?: boolean}) => {
+  const report = await runDoctor(process.cwd());
+  const agents = report.providers;
+  process.stdout.write(options.json ? `${JSON.stringify({agents}, null, 2)}\n` : `${agents.map(agent => `${agent.name}\t${agent.status}\t${agent.summary}`).join('\n')}\n`);
 });
 
 program.command('sessions').description('list sessions').option('--json', 'emit structured JSON').action((options: {json?: boolean}) => {
@@ -96,4 +92,18 @@ function normalizeScenario(value: string): SimulationScenario {
   const upper = value.toUpperCase();
   const allowed = new Set(['FAST', 'SLOW', 'STREAMING', 'TOOL_HEAVY', 'AUTH_FAILURE', 'RATE_LIMIT', 'CRASH', 'TIMEOUT', 'PERMISSION_REQUEST', 'MALFORMED_STREAM']);
   return (allowed.has(upper) ? upper : 'STREAMING') as SimulationScenario;
+}
+
+async function runCodexHeadless(prompt: string, store: AteamStore) {
+  const adapter = new CodexAdapter('codex', process.cwd());
+  const sessionId = `codex-${Date.now()}`;
+  store.createSession(sessionId, prompt.trim().slice(0, 80) || 'Codex run');
+  const events = await adapter.runOnce(prompt);
+  for (const event of events) {
+    store.appendEvent(sessionId, event);
+  }
+  const failed = events.some(event => event.type === 'RuntimeError' || (event.type === 'AgentAvailabilityChanged' && event.availability === 'AUTH_ERROR'));
+  const status = failed ? 'failed' : 'completed';
+  store.finishSession(sessionId, status);
+  return {sessionId, prompt, mode: 'provider', provider: 'codex', status, events};
 }

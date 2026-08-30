@@ -24,6 +24,11 @@ export interface ProcessResult {
   aborted: boolean;
 }
 
+export interface StreamingProcessSpec extends ProcessSpec {
+  onStdout?: (chunk: string) => void;
+  onStderr?: (chunk: string) => void;
+}
+
 export async function runProcess(spec: ProcessSpec): Promise<ProcessResult> {
   const started = Date.now();
   let timedOut = false;
@@ -101,6 +106,88 @@ export async function runProcess(spec: ProcessSpec): Promise<ProcessResult> {
     } else {
       child.stdin.end();
     }
+  });
+}
+
+export async function streamProcess(spec: StreamingProcessSpec): Promise<ProcessResult> {
+  const started = Date.now();
+  let timedOut = false;
+  let aborted = false;
+  const resolved = resolveExecutable(spec.executable);
+  const spawnSpec = commandForSpawn(resolved, spec.args);
+
+  return await new Promise<ProcessResult>((resolve, reject) => {
+    const child = spawn(spawnSpec.executable, spawnSpec.args, {
+      cwd: spec.cwd,
+      env: {...process.env, ...spec.env},
+      windowsHide: true,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let settled = false;
+    let timeout: NodeJS.Timeout | undefined;
+
+    const finish = (exitCode: number | null, signal: NodeJS.Signals | null) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      spec.signal?.removeEventListener('abort', onAbort);
+      resolve({
+        executable: resolved,
+        args: spec.args,
+        cwd: spec.cwd,
+        exitCode,
+        signal,
+        stdout: Buffer.concat(stdout).toString('utf8'),
+        stderr: Buffer.concat(stderr).toString('utf8'),
+        durationMs: Date.now() - started,
+        timedOut,
+        aborted,
+      });
+    };
+
+    const terminate = async () => {
+      if (child.pid !== undefined) await terminateProcessTree(child.pid);
+    };
+    const onAbort = () => {
+      aborted = true;
+      void terminate();
+    };
+
+    child.once('error', error => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      spec.signal?.removeEventListener('abort', onAbort);
+      reject(error);
+    });
+    child.once('close', finish);
+    child.stdout.on('data', chunk => {
+      const buffer = Buffer.from(chunk);
+      stdout.push(buffer);
+      spec.onStdout?.(buffer.toString('utf8'));
+    });
+    child.stderr.on('data', chunk => {
+      const buffer = Buffer.from(chunk);
+      stderr.push(buffer);
+      spec.onStderr?.(buffer.toString('utf8'));
+    });
+
+    if (spec.signal) {
+      if (spec.signal.aborted) onAbort();
+      else spec.signal.addEventListener('abort', onAbort, {once: true});
+    }
+
+    if (spec.timeoutMs !== undefined) {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        void terminate();
+      }, spec.timeoutMs);
+    }
+
+    child.stdin.end(spec.stdin ?? '');
   });
 }
 

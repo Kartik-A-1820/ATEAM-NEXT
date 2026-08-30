@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import process from 'node:process';
-import {resolveExecutable, runProcess} from './runner.js';
+import {resolveExecutable, runProcess, streamProcess} from './runner.js';
 
 describe('process runner', () => {
   it('runs an executable with explicit argv and captures stdout/stderr separately', async () => {
@@ -29,5 +29,19 @@ describe('process runner', () => {
 
   it('resolves executables through PATH on Windows', () => {
     expect(resolveExecutable(process.execPath)).toBe(process.execPath);
+  });
+
+  it('streams stdout chunks while retaining final output', async () => {
+    const chunks: string[] = [];
+    const result = await streamProcess({
+      executable: process.execPath,
+      args: ['-e', "process.stdout.write('a'); setTimeout(() => process.stdout.write('b'), 20);"],
+      cwd: process.cwd(),
+      onStdout: chunk => chunks.push(chunk),
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('ab');
+    expect(chunks.join('')).toBe('ab');
   });
 });

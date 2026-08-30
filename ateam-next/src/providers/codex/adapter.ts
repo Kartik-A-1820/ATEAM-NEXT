@@ -1,4 +1,4 @@
-import {runProcess} from '../../process/runner.js';
+import {runProcess, streamProcess} from '../../process/runner.js';
 import type {AteamEvent, ProviderAdapter} from '../../domain/events.js';
 import type {AgentAvailability} from '../../domain/types.js';
 import {parseCodexJsonl} from './parser.js';
@@ -41,7 +41,7 @@ export class CodexAdapter implements ProviderAdapter {
 
   async runOnce(message: string): Promise<AteamEvent[]> {
     this.abortController = new AbortController();
-    const result = await runProcess({
+    const result = await streamProcess({
       executable: this.executable,
       args: ['exec', '--cd', this.cwd, '--skip-git-repo-check', '--json', '-'],
       cwd: this.cwd,
