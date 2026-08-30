@@ -43,6 +43,7 @@ export interface TaskNode {
   objective: string;
   status: TaskStatus;
   assignedAgent?: AgentId;
+  dependencies: string[];
   priority: number;
 }
 

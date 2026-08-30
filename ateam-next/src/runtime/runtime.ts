@@ -1,5 +1,8 @@
 import {classifyMessage, Simulator, type SimulationScenario} from './simulator.js';
 import {tabForCommand, type AteamEvent, type RuntimeCommand} from '../domain/events.js';
+import {createInitialTaskGraph} from '../planner/taskGraph.js';
+import {initialState} from '../domain/state.js';
+import {scheduleTask} from '../scheduler/scheduler.js';
 
 export class RuntimeController {
   private simulator?: Simulator;
@@ -26,6 +29,7 @@ export class RuntimeController {
           }
         }
         if (this.simulator) {
+          this.planAndSchedule(command.message, at);
           this.active = true;
           this.simulator.run(command.message, this.scenario, {emitClassification: false});
         }
@@ -70,5 +74,18 @@ export class RuntimeController {
       return;
     }
     this.send({type: 'RuntimeError', message: args[0] ? `Unknown command /${args[0]}` : `Unknown command /${name}`, at});
+  }
+
+  private planAndSchedule(objective: string, at: number): void {
+    const graph = createInitialTaskGraph(objective);
+    const state = initialState();
+    for (const task of graph.tasks) {
+      this.send({type: 'TaskCreated', taskId: `P-${task.id}`, objective: task.objective, dependencies: task.dependencies.map(dep => `P-${dep}`), at});
+      const assignment = scheduleTask(task, state.agents);
+      if (assignment) {
+        this.send({type: 'TaskAssigned', taskId: `P-${task.id}`, agentId: assignment.agentId, reason: assignment.reason, at});
+      }
+    }
+    this.send({type: 'PlanUpdated', summary: `Plan created for: ${objective}`, at});
   }
 }

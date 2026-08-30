@@ -15,7 +15,9 @@ Ateam uses provider-neutral events. The UI consumes state derived from these eve
 - `ToolFinished`
 - `PermissionRequested`
 - `TaskCreated`
+- `TaskAssigned`
 - `TaskStatusChanged`
+- `TaskInvalidated`
 - `PlanUpdated`
 - `ContextUpdated`
 - `RateLimited`

@@ -19,6 +19,7 @@
 - Codex adapter parser fixtures and scaffold added.
 - Streaming process runner added for future provider adapters.
 - Permission policy, initial task graph, and deterministic scheduler skeletons added.
+- Planner/scheduler now emit canonical task creation and assignment events into simulated runtime.
 - Unit tests for commands, reducer, input editor, runtime, simulator, process runner, headless mode, and TUI render/input.
 
 ## IN_PROGRESS
@@ -36,8 +37,8 @@
 ## NEXT
 
 - Milestone 2 core runtime: lifecycle, error model, effect boundaries.
-- Connect planner/scheduler to the live runtime.
 - Add context compiler and provenance-aware memory.
+- Add provider-streaming integration for Codex beyond fixture parsing.
 - Add render throttling and scrollback windowing.
 - Expand process-control utilities with provider fixtures and abort-signal tests.
 - Expand simulation tests for rate limit, permission, crash, and cancellation.

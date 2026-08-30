@@ -104,7 +104,7 @@ function MainPane({state, entries, height, width}: {state: ReturnType<typeof ini
     return (
       <Box flexDirection="column" height={height} paddingX={1}>
         {tasks.length === 0 ? <Text>No tasks yet.</Text> : tasks.map(task => (
-          <Text key={task.id}>{task.id} {task.status} {task.assignedAgent ?? 'unassigned'} - {task.objective}</Text>
+          <Text key={task.id}>{task.id} {task.status} {task.assignedAgent ?? 'unassigned'} deps={task.dependencies.join(',') || '-'} - {task.objective}</Text>
         ))}
       </Box>
     );

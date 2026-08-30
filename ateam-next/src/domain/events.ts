@@ -28,7 +28,8 @@ export const eventSchema = z.discriminatedUnion('type', [
   z.object({type: z.literal('ToolStarted'), agentId, tool: z.string(), at: z.number()}),
   z.object({type: z.literal('ToolFinished'), agentId, tool: z.string(), result: z.string(), at: z.number()}),
   z.object({type: z.literal('PermissionRequested'), agentId, capability: z.string(), reason: z.string(), at: z.number()}),
-  z.object({type: z.literal('TaskCreated'), taskId: z.string(), objective: z.string(), assignedAgent: agentId.optional(), at: z.number()}),
+  z.object({type: z.literal('TaskCreated'), taskId: z.string(), objective: z.string(), assignedAgent: agentId.optional(), dependencies: z.array(z.string()).optional(), at: z.number()}),
+  z.object({type: z.literal('TaskAssigned'), taskId: z.string(), agentId, reason: z.string(), at: z.number()}),
   z.object({type: z.literal('TaskStatusChanged'), taskId: z.string(), status: z.enum(['PENDING', 'READY', 'RUNNING', 'BLOCKED', 'COMPLETED', 'FAILED', 'CANCELLED', 'INVALIDATED']), at: z.number()}),
   z.object({type: z.literal('PlanUpdated'), summary: z.string(), at: z.number()}),
   z.object({type: z.literal('ContextUpdated'), summary: z.string(), at: z.number()}),
@@ -38,6 +39,7 @@ export const eventSchema = z.discriminatedUnion('type', [
   z.object({type: z.literal('PermissionModeChanged'), mode: z.enum(['SAFE', 'STANDARD', 'FULL']), at: z.number()}),
   z.object({type: z.literal('StopRequested'), scope: z.string(), at: z.number()}),
   z.object({type: z.literal('ViewChanged'), tab: z.enum(['Plan', 'Agents', 'Tasks', 'Diff', 'Context', 'Logs']), at: z.number()}),
+  z.object({type: z.literal('TaskInvalidated'), taskId: z.string(), reason: z.string(), at: z.number()}),
 ]);
 
 export type AteamEvent = z.infer<typeof eventSchema>;

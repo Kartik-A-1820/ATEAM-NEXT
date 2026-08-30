@@ -36,4 +36,14 @@ describe('state reducer', () => {
     const state = reduce(initialState(), {type: 'ViewChanged', tab: 'Agents', at: 1});
     expect(state.activeTab).toBe('Agents');
   });
+
+  it('records task assignment and invalidation events', () => {
+    let state = initialState();
+    state = reduce(state, {type: 'TaskCreated', taskId: 'T1', objective: 'implement', dependencies: ['T0'], at: 1});
+    state = reduce(state, {type: 'TaskAssigned', taskId: 'T1', agentId: 'codex', reason: 'implementation score=120', at: 2});
+    state = reduce(state, {type: 'TaskInvalidated', taskId: 'T1', reason: 'new user constraint', at: 3});
+    expect(state.tasks.T1.assignedAgent).toBe('codex');
+    expect(state.tasks.T1.dependencies).toEqual(['T0']);
+    expect(state.tasks.T1.status).toBe('INVALIDATED');
+  });
 });

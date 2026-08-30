@@ -78,7 +78,18 @@ export function reduce(state: AppState, event: AteamEvent): AppState {
       next.conversation.push(entry('System', `Permission requested by ${event.agentId}: ${event.capability} (${event.reason})`, 'NORMAL'));
       return next;
     case 'TaskCreated':
-      next.tasks[event.taskId] = {id: event.taskId, objective: event.objective, assignedAgent: event.assignedAgent, status: 'READY', priority: 50};
+      next.tasks[event.taskId] = {id: event.taskId, objective: event.objective, assignedAgent: event.assignedAgent, dependencies: event.dependencies ?? [], status: 'READY', priority: 50};
+      return next;
+    case 'TaskAssigned':
+      if (next.tasks[event.taskId]) {
+        next.tasks[event.taskId] = {...next.tasks[event.taskId], assignedAgent: event.agentId};
+      }
+      next.conversation.push(entry('Ateam', `${event.taskId} assigned to ${event.agentId}: ${event.reason}`, 'VERBOSE'));
+      return next;
+    case 'TaskInvalidated':
+      if (next.tasks[event.taskId]) {
+        next.tasks[event.taskId] = {...next.tasks[event.taskId], status: 'INVALIDATED'};
+      }
       return next;
     case 'TaskStatusChanged':
       if (next.tasks[event.taskId]) {
