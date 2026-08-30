@@ -10,6 +10,8 @@ import {AteamStore} from './storage/store.js';
 import {formatSessionList, replaySession} from './storage/session.js';
 import {formatDoctor, runDoctor} from './doctor/doctor.js';
 import {CodexAdapter} from './providers/codex/adapter.js';
+import {formatAgentEvents} from './agents/format.js';
+import {probeLocalAgents} from './agents/probe.js';
 
 const program = new Command();
 
@@ -64,9 +66,8 @@ program.command('doctor')
   });
 
 program.command('agents').description('show agent status').option('--json', 'emit structured JSON').action(async (options: {json?: boolean}) => {
-  const report = await runDoctor(process.cwd());
-  const agents = report.providers;
-  process.stdout.write(options.json ? `${JSON.stringify({agents}, null, 2)}\n` : `${agents.map(agent => `${agent.name}\t${agent.status}\t${agent.summary}`).join('\n')}\n`);
+  const events = await probeLocalAgents(process.cwd());
+  process.stdout.write(options.json ? `${JSON.stringify({agents: events}, null, 2)}\n` : formatAgentEvents(events));
 });
 
 program.command('sessions').description('list sessions').option('--json', 'emit structured JSON').action((options: {json?: boolean}) => {

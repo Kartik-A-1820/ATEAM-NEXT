@@ -31,6 +31,7 @@
 - Reducer running state now reflects active/blocked execution instead of planned-but-idle tasks.
 - Codex adapter doctor normalization distinguishes auth failures from non-blocking terminal/Windows warnings.
 - Real-mode TUI startup now probes local provider executables and updates agent availability/version state through canonical events.
+- `ateam agents` now uses the same canonical provider probe path as the TUI and supports JSON/text output.
 - Unit tests for commands, reducer, input editor, runtime, simulator, process runner, headless mode, and TUI render/input.
 
 ## IN_PROGRESS

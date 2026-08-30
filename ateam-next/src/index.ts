@@ -14,3 +14,4 @@ export {scheduleTask} from './scheduler/scheduler.js';
 export {MemoryStore} from './memory/memory.js';
 export {compileContextPacket} from './context/compiler.js';
 export {probeLocalAgents, availabilityFromVersionProbe} from './agents/probe.js';
+export {formatAgentEvents} from './agents/format.js';
