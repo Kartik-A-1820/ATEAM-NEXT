@@ -1,37 +1,22 @@
-# Ateam Next
+# ATEAM-NEXT package
 
-Next-generation Ateam scratch project.
+Run commands in this directory. See the [repository README](../README.md) for scope and prerequisites.
 
-## Run
-
-```powershell
-npm install
+```bash
+npm ci
 npm run dev
 ```
 
-Equivalent direct command:
+The dev command starts simulation. For a headless check:
 
-```powershell
-npx tsx src/cli.tsx dev --simulate
+```bash
+npm run start -- run "Inspect a sample task" --simulate --json
+npm run start -- sessions --json
+npm run check
 ```
 
-Useful scenarios:
+Choose a scenario with `npm run start -- dev --simulate --scenario TOOL_HEAVY`. Other scenarios include `AUTH_FAILURE`, `RATE_LIMIT`, `CRASH`, `TIMEOUT`, `PERMISSION_REQUEST`, and `MALFORMED_STREAM`.
 
-```powershell
-npx tsx src/cli.tsx run "Refactor auth" --simulate --json
-npx tsx src/cli.tsx sessions
-npx tsx src/cli.tsx resume
-npx tsx src/cli.tsx doctor
-npx tsx src/cli.tsx dev --simulate --scenario TOOL_HEAVY
-npx tsx src/cli.tsx dev --simulate --scenario RATE_LIMIT
-npx tsx src/cli.tsx dev --simulate --scenario PERMISSION_REQUEST
-npx tsx src/cli.tsx dev --simulate --scenario CRASH
-```
+`npm run start -- resume --json` inspects a stored session; interactive resume currently reopens a simulated TUI. `doctor` and `agents` probe local provider executables. Commands without `--simulate` may invoke live providers; do not substitute them for simulation examples.
 
-## Check
-
-```powershell
-npm run build
-npm run lint
-npm test
-```
+Development checks: `npm run build`, `npm run lint`, and `npm test`, or their combined `npm run check` target. See [CONTRIBUTING.md](../CONTRIBUTING.md) for validation and reporting expectations.
